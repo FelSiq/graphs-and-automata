@@ -59,32 +59,24 @@ def gen_transition_matrix(number, base=2):
 
 	return transition_mat
 
-"""
-#  A small test
-
-test_num = 100000
-def test(mat, num, base):
-	fail = False
-	for i in range(0, test_num, num):
+def test(cases, mat, num, base):
+	n = len(cases)
+	ans = [True] * n
+	
+	for i in range(n):
 		cur_state = state_form(0)
 
-		print(i, "...", end="")
-		for c in conv_to_base(i, base):
-			print(c, end="")
+		for c in cases[i]:
 			cur_state = mat[cur_state][int(c, base=base)]
-		print()
 
 		if cur_state != state_form(0):
-			print(cur_state)
-			fail = True
-			break
+			ans[i] = False 
 
-	return not fail
-"""
+	return ans
 
 if __name__ == "__main__":
 	if len(sys.argv) < 2:
-		print("usage:", sys.argv[0], "<number> [base]")
+		print("usage:", sys.argv[0], "<number> [base] [test cases comma separated]")
 		exit(1)
 
 	try:
@@ -99,5 +91,14 @@ if __name__ == "__main__":
 	for state in sorted(transition_mat.keys(), key=lambda k: int(k[1:])):
 		print(state, "\t:", transition_mat[state])
 
-	# A small test...
-	# print("Passed test:", test(transition_mat, number, base))
+	try:
+		test_cases = sys.argv[3].split(",")
+		ans = test(test_cases, transition_mat, number, base)
+
+		print("Test cases:")
+		for test, res in zip(test_cases, ans):
+			print(test, ":", res)
+
+	except Exception as e:
+		print(e)
+
