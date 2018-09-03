@@ -1,0 +1,26 @@
+# This is a simple graph for testing purposes
+# Commentary lines, starting with "#", are allowed
+
+# "d" is a flag to toggle "directed" graph property. 
+# By default, graph is not directed, so transition 
+# matrix will be symmetric
+d
+
+# Vertex should start with a "v" mark
+v 0
+v 1
+v 2
+
+# Edges should start with a "e" marker
+e 0 1 2.0
+e 1 2 3.5
+
+# One can mix directed edges with
+# non-directed edges, toggling "d".
+d
+
+e 0 2 7.0
+
+# Heuristic cost for informed searchs 
+# should start with "h" marker
+h 1 5.0
