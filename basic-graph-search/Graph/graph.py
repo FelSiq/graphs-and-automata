@@ -103,21 +103,21 @@ class Graph:
 					elif d_match:
 						self.directed = not self.directed
 
-	def print_graph(self):
+	def print_graph(self, fill_factor=8):
 		sorted_transit_keys = sorted(self.transit_mat.keys())
 
-		print(8 * " ", end=" ")
+		print(fill_factor * " ", end=" ")
 		for v in sorted_transit_keys:
-			print("{val:<{fill}}  ".format(val=v, fill=8), end="")
+			print("{val:<{fill}}  ".format(val=v, fill=fill_factor), end="")
 		print()
 
 		for v_a in sorted_transit_keys:
-			print("{val:<{fill}}".format(val=v_a, fill=8), end=":")
+			print("{val:<{fill}}".format(val=v_a, fill=fill_factor), end=":")
 			cur_vertex = self.transit_mat[v_a]
 			for v_b in sorted_transit_keys:
 				print("[{val:<{fill}}]".format(
 					val=(cur_vertex[v_b] if v_b in cur_vertex else ""), 
-					fill=8), end="")
+					fill=fill_factor), end="")
 			print()
 
 

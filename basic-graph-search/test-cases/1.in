@@ -1,0 +1,60 @@
+# This is a simplified version of the famous "Arad/Bucharest" map
+# usually used as a example of a shortest path problem in a computer
+# science class.
+
+v a 
+v b 
+v c 
+v d 
+v e 
+v f 
+v g 
+v h 
+v i 
+v l 
+v m 
+v n 
+v o 
+v p 
+v r 
+v s 
+v t
+v u 
+v v
+v z
+e a z 75
+e a t 118
+e a s 140
+e z o 71
+e o s 151
+e t l 111
+e l m 70
+e m d 75
+e d c 120
+e c r 146
+e s r 80
+e c p 138
+e r p 97
+e f b 211
+e p b 101
+e s f 99
+h a 366
+h b 0
+h c 160
+h d 242
+h e 161
+h f 178
+h g 77
+h h 151
+h i 226
+h l 244
+h m 241
+h n 234
+h o 380
+h p 98
+h r 193
+h s 253
+h t 329
+h u 80
+h v 199
+h z 374
