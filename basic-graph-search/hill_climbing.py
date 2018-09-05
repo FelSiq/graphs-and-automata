@@ -1,4 +1,5 @@
 from Graph.graph import Graph
+from numpy import random as rd
 
 """
 	Hill-Climbing (HC) implementation. This algorithm
@@ -28,7 +29,7 @@ from Graph.graph import Graph
 		ism to the algorithm.
 
 	- FC ("FIRST CHOICE"): choose the first neighbor that
-		has better heuristic cost than the current node.
+		has better heuristic cost than the current vertex.
 		Good when the number of neighbors is big.
 
 	- RR ("RANDOM RESTART"): runs Hill Climbing algorithm
@@ -38,14 +39,103 @@ from Graph.graph import Graph
 """
 
 class HillClimbing(Graph):
-	def search(self, start, end, strategy="DF", full_output=True):
+	def search(self, start, end, 
+		strategy="DF", 
+		stochastic_factor=2.0, 
+		full_output=True, 
+		sort_edges=True):
 
 		if strategy not in ("DF", "ST", "FC"):
 			print("Error: unknown strategy",
 				"selected (\"" + strategy + "\")")
 			return None
 
-		return None
+		if strategy == "ST":
+			strategy_desc = "Stochastic"
+		elif strategy == "FC":
+			strategy_desc = "First Choice"
+		else:
+			strategy_desc = "Default"
+
+		ans = {
+			"strategy:" : "Hill Climbing" +\
+				" (version \"" + strategy_desc + "\")", 
+			"total_cost" : 0.0,
+			"found_path" : [],
+			"found_goal" : False,
+			"edges_sorted" : sort_edges
+		}
+		# Fun fact: in HC, the "found_path" is exactly
+		# the "visit_order" vector.
+
+		# Hill Climbing is Beam Search with k=1,
+		# which means that it don't need to keep
+		# a activated vertex list, as it is a
+		# greedy algorithm without backtracking.
+		next_vertex = start
+
+		while next_vertex:
+			cur_vertex = next_vertex
+			
+			ans["found_path"].append(cur_vertex)
+
+			if cur_vertex == end:
+				next_vertex = None
+				ans["found_goal"] = True
+
+			else:
+				if strategy == "ST":
+					# Used just for STOCHASTIC strategy
+					total_h_cost = 0.0
+					better_neighbors = []
+					neighbor_prob = []
+
+				edges_list = self.transit_mat[cur_vertex].keys()
+				if sort_edges:
+					edges_list = sorted(edges_list)
+
+				for adj_vertex in edges_list:
+					# Note: if operator "<" is substitued by "<=", then the
+					# algorithm will walk in plateaus instead of stopping when
+					# it reaches one.
+					if self.heuristic_cost[adj_vertex] < self.heuristic_cost[next_vertex]:
+						if strategy != "ST":
+							next_vertex = adj_vertex
+						else:
+							# If "Stochastic" strategy is used, each
+							# better adjacent vertex has a probability
+							# to be selected. This probability depends
+							# on how promissing each vertex is (i.e how
+							# small is its heuristic cost)
+							total_h_cost += self.heuristic_cost[adj_vertex]
+							better_neighbors.append(adj_vertex)
+							neighbor_prob.append(self.heuristic_cost[adj_vertex])
+						
+						# If strategy is "First Choice", stop searching
+						# for a better neighbor.
+						if strategy == "FC":
+							break
+
+				if strategy == "ST" and len(better_neighbors):
+					if end not in better_neighbors:
+						# If we not found the desired end, pick a random next
+						# state based on its heurist cost
+						neighbor_prob = [total_h_cost / (val**stochastic_factor) for val in neighbor_prob]
+						neighbor_prob = [val / sum(neighbor_prob) for val in neighbor_prob]
+						next_vertex = rd.choice(better_neighbors, size=1, p=neighbor_prob)[0]
+					else:
+						# Otherwise, we're done.
+						next_vertex = end
+
+				if next_vertex == cur_vertex:
+					next_vertex = None
+				else:
+					ans["total_cost"] += self.transit_mat[cur_vertex][next_vertex]
+		
+		if full_output:
+			return ans
+
+		return ans["found_path"]
 
 	def random_restart(self, k=5, full_output=False):
 		return None
@@ -71,6 +161,8 @@ if __name__ == "__main__":
 		exit(1)
 
 	g = HillClimbing(sys.argv[1])
+
+	g.print_graph(fill_factor = 5)
 
 	strategy = sys.argv[2].upper()
 
