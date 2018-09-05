@@ -1,5 +1,6 @@
 from Graph.graph import Graph
 from numpy import random as rd
+from math import inf
 
 """
 	Hill-Climbing (HC) implementation. This algorithm
@@ -45,6 +46,8 @@ class HillClimbing(Graph):
 		full_output=True, 
 		sort_edges=True):
 
+		epsilon = 1.0e-8
+
 		if strategy not in ("DF", "ST", "FC"):
 			print("Error: unknown strategy",
 				"selected (\"" + strategy + "\")")
@@ -58,7 +61,7 @@ class HillClimbing(Graph):
 			strategy_desc = "Default"
 
 		ans = {
-			"strategy:" : "Hill Climbing" +\
+			"strategy" : "Hill Climbing" +\
 				" (version \"" + strategy_desc + "\")", 
 			"total_cost" : 0.0,
 			"found_path" : [],
@@ -86,7 +89,7 @@ class HillClimbing(Graph):
 			else:
 				if strategy == "ST":
 					# Used just for STOCHASTIC strategy
-					total_h_cost = 0.0
+					total_h_cost = epsilon
 					better_neighbors = []
 					neighbor_prob = []
 
@@ -109,7 +112,7 @@ class HillClimbing(Graph):
 							# small is its heuristic cost)
 							total_h_cost += self.heuristic_cost[adj_vertex]
 							better_neighbors.append(adj_vertex)
-							neighbor_prob.append(self.heuristic_cost[adj_vertex])
+							neighbor_prob.append(epsilon + self.heuristic_cost[adj_vertex])
 						
 						# If strategy is "First Choice", stop searching
 						# for a better neighbor.
@@ -121,7 +124,7 @@ class HillClimbing(Graph):
 						# If we not found the desired end, pick a random next
 						# state based on its heurist cost
 						neighbor_prob = [total_h_cost / (val**stochastic_factor) for val in neighbor_prob]
-						neighbor_prob = [val / sum(neighbor_prob) for val in neighbor_prob]
+						neighbor_prob = [val / (sum(neighbor_prob)) for val in neighbor_prob]
 						next_vertex = rd.choice(better_neighbors, size=1, p=neighbor_prob)[0]
 					else:
 						# Otherwise, we're done.
@@ -137,8 +140,52 @@ class HillClimbing(Graph):
 
 		return ans["found_path"]
 
-	def random_restart(self, k=5, full_output=False):
-		return None
+	def random_restart(self, k=5, comp_strategy="DF", full_output=False):
+
+		if comp_strategy not in ("DF", "ST", "FC"):
+			print("Error: unknown complementary strategy",
+				"selected (\"" + comp_strategy + "\")")
+			return None
+
+		epsilon=1.0e-8
+		best_ans = None
+		for i in range(k):
+			# Generate a random starting point
+			start = rd.choice(list(self.transit_mat.keys()), size=1)[0]
+
+			# Run HC, with defined complementary strategy
+			# (Stochastic, First Choice or Default)
+			# starting from the selected vertex
+			aux_ans = self.search(
+				start=start, 
+				end="", 
+				strategy=comp_strategy, 
+				full_output=True)
+
+			if best_ans is None:
+				best_ans = aux_ans
+			else:
+
+				# Pick up the answer with the smallest
+				# heuristic cost of final vertex between 
+				# all iterations. If two solutions has the
+				# same final heuristic cost, choose the
+				# one with the smallest total real cost.
+				final_h_cost = self.heuristic_cost[aux_ans["found_path"][-1]]
+				curr_h_cost = self.heuristic_cost[best_ans["found_path"][-1]]
+
+				if final_h_cost < curr_h_cost or \
+					(abs(final_h_cost - curr_h_cost) < epsilon and \
+					aux_ans["total_cost"] < best_ans["total_cost"]):
+					best_ans = aux_ans
+		
+		if full_output:
+			best_ans["final_h_cost"] = self.heuristic_cost[best_ans["found_path"][-1]]
+			best_ans["strategy"] = best_ans["strategy"] + \
+				" with " + str(k) + " Random Restarts"
+			return best_ans
+
+		return best_ans["found_path"]
 
 if __name__ == "__main__":
 	import sys
@@ -155,7 +202,7 @@ if __name__ == "__main__":
 				" starting at a random point. The best global answer is returned.",
 			"\nAdditional paramaters:\n",
 			"If selected strategy is \"RR\":",
-			"\t[iterations (default to 5)]",
+			"\t[iterations (default to 5)] [complementary strategy (default to DF)]",
 			"Otherwise:",
 			"\t<start> <end>", sep="\n")
 		exit(1)
@@ -188,13 +235,23 @@ if __name__ == "__main__":
 		except:
 			k = 5
 
-		ans = g.random_restart(k=k, full_output=True)
+		try:
+			comp_strategy = sys.argv[4].upper()
+		except:
+			comp_strategy = "DF"
+
+		ans = g.random_restart(k=k, 
+			comp_strategy=comp_strategy, 
+			full_output=True)
 	else:
 		print("Error: unknown strategy",
 			"selected (\"" + strategy + "\")")
 		exit(2)
 
+	print("Result:")
 	if ans is not None:
 		for attr in ans:
 			print(attr, ":", ans[attr])
+	else:
+		print("No found results.")
 
