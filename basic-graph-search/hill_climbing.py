@@ -42,7 +42,7 @@ from math import inf
 class HillClimbing(Graph):
 	def search(self, start, end, 
 		strategy="DF", 
-		stochastic_factor=2.0, 
+		stochastic_factor=2.0,
 		full_output=True, 
 		sort_edges=True):
 
@@ -89,7 +89,6 @@ class HillClimbing(Graph):
 			else:
 				if strategy == "ST":
 					# Used just for STOCHASTIC strategy
-					total_h_cost = epsilon
 					better_neighbors = []
 					neighbor_prob = []
 
@@ -110,9 +109,8 @@ class HillClimbing(Graph):
 							# to be selected. This probability depends
 							# on how promissing each vertex is (i.e how
 							# small is its heuristic cost)
-							total_h_cost += self.heuristic_cost[adj_vertex]
 							better_neighbors.append(adj_vertex)
-							neighbor_prob.append(epsilon + self.heuristic_cost[adj_vertex])
+							neighbor_prob.append(self.heuristic_cost[adj_vertex])
 						
 						# If strategy is "First Choice", stop searching
 						# for a better neighbor.
@@ -123,9 +121,11 @@ class HillClimbing(Graph):
 					if end not in better_neighbors:
 						# If we not found the desired end, pick a random next
 						# state based on its heurist cost
-						neighbor_prob = [total_h_cost / (val**stochastic_factor) for val in neighbor_prob]
-						neighbor_prob = [val / (sum(neighbor_prob)) for val in neighbor_prob]
-						next_vertex = rd.choice(better_neighbors, size=1, p=neighbor_prob)[0]
+						neighbor_prob = [1.0 / (epsilon + \
+							val**stochastic_factor) for val in neighbor_prob]
+						total_cost = sum(neighbor_prob)
+						neighbor_prob = [val / total_cost for val in neighbor_prob]
+						next_vertex = rd.choice(better_neighbors, p=neighbor_prob)
 					else:
 						# Otherwise, we're done.
 						next_vertex = end
