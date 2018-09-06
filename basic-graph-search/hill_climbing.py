@@ -43,8 +43,27 @@ class HillClimbing(Graph):
 	def search(self, start, end, 
 		strategy="DF", 
 		stochastic_factor=2.0,
+		sim_annealing_fac=1.0,
 		full_output=True, 
 		sort_edges=True):
+
+		"""
+			In the stochastic version, we have two "new" parameters:
+
+			"stochastic_factor": the value which the inverse of 
+				heuristic cost will be raised to the power of.
+			"sim_annealing_fac": As long the iteration of the HC al-
+				gorithm goes, the "stochastic_factor" will become 
+				greater and greater to the rate of given "simulated_-
+				annealing" value, meaning that the most promising 
+				adjacent vertexes will be selected more and more often.
+		"""
+		
+		# "stochastic_factor" must be a non-negative value
+		stochastic_factor = max(stochastic_factor, 0.0)
+
+		# "sim_annealing_fac" must be equal or greater than 1.0
+		sim_annealing_fac = max(sim_annealing_fac, 1.0)
 
 		epsilon = 1.0e-8
 
@@ -54,7 +73,10 @@ class HillClimbing(Graph):
 			return None
 
 		if strategy == "ST":
-			strategy_desc = "Stochastic"
+			strategy_desc = "Stochastic" +\
+				(" with Simulated Annealing at rate " +\
+				str(sim_annealing_fac) if sim_annealing_fac > 1.0 \
+				else "")
 		elif strategy == "FC":
 			strategy_desc = "First Choice"
 		else:
@@ -126,6 +148,8 @@ class HillClimbing(Graph):
 						total_cost = sum(neighbor_prob)
 						neighbor_prob = [val / total_cost for val in neighbor_prob]
 						next_vertex = rd.choice(better_neighbors, p=neighbor_prob)
+
+						stochastic_factor *= sim_annealing_fac
 					else:
 						# Otherwise, we're done.
 						next_vertex = end
@@ -140,7 +164,11 @@ class HillClimbing(Graph):
 
 		return ans["found_path"]
 
-	def random_restart(self, k=5, comp_strategy="DF", full_output=False):
+	def random_restart(self, k=5, comp_strategy="DF", 
+		sim_annealing_fac=1.0, full_output=False):
+
+		# k must be at leats 1
+		k = max(k, 1)
 
 		if comp_strategy not in ("DF", "ST", "FC"):
 			print("Error: unknown complementary strategy",
@@ -160,6 +188,7 @@ class HillClimbing(Graph):
 				start=start, 
 				end="", 
 				strategy=comp_strategy, 
+				sim_annealing_fac=sim_annealing_fac,
 				full_output=True)
 
 			if best_ans is None:
@@ -202,7 +231,9 @@ if __name__ == "__main__":
 				" starting at a random point. The best global answer is returned.",
 			"\nAdditional paramaters:\n",
 			"If selected strategy is \"RR\":",
-			"\t[iterations (default to 5)] [complementary strategy (default to DF)]",
+			"\t[iterations (default to 5) >= 0] [complementary strategy (default to DF)]",
+			"If selected strategy is \"ST\":",
+			"\t<start> <end> [Simulated Annealing factor >= 1.0 - default is 1.0]",
 			"Otherwise:",
 			"\t<start> <end>", sep="\n")
 		exit(1)
@@ -223,10 +254,16 @@ if __name__ == "__main__":
 				"usage information)")
 			exit(3)
 
+		try:
+			sim_annealing = float(sys.argv[5])
+		except:
+			sim_annealing = 1.0
+
 		ans = g.search(
 			start=sys.argv[3], 
 			end=sys.argv[4],
 			strategy=strategy,
+			sim_annealing_fac=sim_annealing,
 			full_output=True)
 
 	elif strategy == "RR":
