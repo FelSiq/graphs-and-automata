@@ -80,13 +80,28 @@ class BeamSearch(Graph):
 		k=5,
 		stochastic=False, 
 		stochastic_factor=2.0,
+		sim_annealing_fac=1.0,
 		full_output=False,
 		track_visited=True):
 
 		epsilon = 1.0e-8
 
+		# Stochastic factor must be non negative.
+		stochastic_factor = max(stochastic_factor, 0.0)
+
+		# "simulated_annealing" must be equal of greater than 1.0
+		# This is the factor that multiply the stochastic factor
+		# Each Beam Search iteration (a iteration is assumed to
+		# to when all adjacent nodes of the current nodes are
+		# activated).
+		sim_annealing_fac = max(sim_annealing_fac, 1.0)
+
 		ans = {
-			"strategy" : ("Stochastic " if (stochastic and k > 0) else "") +\
+			"strategy" : (("Stochastic " +\
+					(("(with Simulated Annealing factor of " +\
+						str(sim_annealing_fac) + ") ") if sim_annealing_fac > 1.0 \
+						else "")) \
+					if (stochastic and k > 0) else "") +\
 				(("Beam Search with width " +\
 				(str(k) if k > 0 else "unlimited"))
 				if k != 1 else "Hill Climbing") +\
@@ -179,6 +194,7 @@ class BeamSearch(Graph):
 					selected_h_cost = array([1.0 / (epsilon + \
 						val**stochastic_factor) for val in selected_h_cost])
 					selected_h_cost /= sum(selected_h_cost)
+					stochastic_factor *= sim_annealing_fac
 
 					try:
 						# If tracking visited nodes, one can just
@@ -244,6 +260,7 @@ if __name__ == "__main__":
 			"<filepath> <start> <end>",
 			"[k - default to 5]",
 			"[stochastic (0/1) - default to 0]",
+			"[Simulated Annealing factor >= 1.0 - default to 1.0]",
 			"[track visited (0/1) - default to 1]",
 			"\n\nTip:",
 			"Use a non-positive k to activate unlimited width of the Beam Search.")
@@ -264,7 +281,13 @@ if __name__ == "__main__":
 		stoc_flag = False
 
 	try:
-		track_visited = int(sys.argv[6])
+		sim_annealing_fac = float(sys.argv[6])
+	except:
+
+		sim_annealing_fac = 1.0
+
+	try:
+		track_visited = int(sys.argv[7])
 	except:
 		track_visited = True
 
@@ -274,6 +297,7 @@ if __name__ == "__main__":
 		k=k,
 		full_output=True,
 		stochastic=stoc_flag,
+		sim_annealing_fac=sim_annealing_fac,
 		track_visited=track_visited)
 
 	for attr in ans:
