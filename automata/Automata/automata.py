@@ -76,7 +76,12 @@ class Automaton:
 		print(",".join(self.alphabet))
 		print(self.initial_state)
 		for state in sorted(self.transit_matrix.keys()):
-			print(state, end=",")
+
+			aux_label = state
+			if state in self.final_state:
+				aux_label = "["  + aux_label + "]"
+			print(aux_label, end=",")
+
 			for symbol in self.alphabet:
 				aux_states = self.transit_matrix[state][symbol]
 				if type(aux_states) != type(""):
