@@ -18,7 +18,7 @@ def search_set(mapping, aux):
 			return state
 	return None
 
-def build_dfa(nfa, invalid_symbol="----", state_prefix="DFA"):
+def build_dfa(nfa, state_prefix="DFA"):
 	# Init DFA ("Deterministic Finite Automaton")
 	dfa = Automaton(
 		alphabet=copy.deepcopy(nfa.alphabet),
@@ -53,7 +53,7 @@ def build_dfa(nfa, invalid_symbol="----", state_prefix="DFA"):
 				else:
 					transit_name = search_set(mapping, aux)
 			else:
-				transit_name = invalid_symbol
+				transit_name = set()
 
 			dfa.transit_matrix[cur_state][c] = transit_name
 
