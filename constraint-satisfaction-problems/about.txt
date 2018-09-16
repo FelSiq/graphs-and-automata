@@ -1,0 +1,20 @@
+# What is a CSP ("Constraint Satisfaction Problem")?
+
+It is a type of problem which can be modeled using
+1. A set of variables V = {v_1, ..., v_n}, n >= 1
+2. A set of variables domain D = {D_1, ..., D_n}, such that v_i is in D_i
+3. A set of constraints C = {c_1, ..., c_m}, m >= 1
+
+A state is an attribution of a value in of D_j to v_j, 
+where j in J and J is a subset {1, ..., n}.
+
+Every value of v_i must respect all constraints c_1, ..., c_m to
+be said CONSISTENT. In systhesis, we want to find a solution to
+the problem always mantaining all variables with consistent values.
+
+A attribution is said to be COMPLETE when all variables v_1, ..., v_n
+has a value. Note that this has nothing to do with CONSISTENCY, becau-
+se a COMPLETE attribution does not require all of these values to be
+CONSISTENT.
+
+A SOLUTION is a COMPLETE and CONSISTENT attribution.
