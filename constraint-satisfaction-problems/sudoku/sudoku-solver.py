@@ -21,22 +21,26 @@ class Sudoku:
 			self.read_file(filepath, sep)
 
 	def __set_position__(self, value, x, y):
+		self.board[y][x] = value
+
 		for i in range(self.board_size):
-			if value in self.domain_matrix[y][i]:
+			if self.board[y][i] == self.empty_val and \
+				value in self.domain_matrix[y][i]:
 				self.domain_matrix[y][i].remove(value)
 
 		for j in range(self.board_size):
-			if value in self.domain_matrix[j][x]:
+			if self.board[j][x] == self.empty_val and \
+				value in self.domain_matrix[j][x]:
 				self.domain_matrix[j][x].remove(value)
 
 		x_start = self.subsquare_size * (x // self.subsquare_size)
 		y_start = self.subsquare_size * (y // self.subsquare_size)
 		for j in range(y_start, y_start + self.subsquare_size):
 			for i in range(x_start, x_start + self.subsquare_size):
-				if value in self.domain_matrix[j][i]:
+				if self.board[j][i] == self.empty_val and \
+					value in self.domain_matrix[j][i]:
 					self.domain_matrix[j][i].remove(value)
 
-		self.board[y][x] = value
 
 	def __check_position__(self, value, x, y):
 		for i in range(self.board_size):
@@ -60,12 +64,22 @@ class Sudoku:
 		self.board[y][x] = self.empty_val
 
 		for i in range(self.board_size):
-			if i != x and self.__check_position__(value, i, y):
+			if i != x and self.board[y][i] == self.empty_val and \
+				self.__check_position__(value, i, y):
 				self.domain_matrix[y][i].update({value})
 
 		for j in range(self.board_size):
-			if j != y and self.__check_position__(value, x, j):
+			if j != y and self.board[j][x] == self.empty_val and \
+				self.__check_position__(value, x, j):
 				self.domain_matrix[j][x].update({value})
+
+		x_start = self.subsquare_size * (x // self.subsquare_size)
+		y_start = self.subsquare_size * (y // self.subsquare_size)
+		for j in range(y_start, y_start + self.subsquare_size):
+			for i in range(x_start, x_start + self.subsquare_size):
+				if self.board[j][i] == self.empty_val and \
+					self.__check_position__(value, i, j):
+					self.domain_matrix[j][i].update({value})
 
 
 	def __smallest_domain_id__(self):
@@ -76,7 +90,6 @@ class Sudoku:
 		for j in range(self.board_size):
 			for i in range(self.board_size):
 				if self.board[j][i] == self.empty_val and \
-					(not self.fixed[j][i]) and \
 					len(self.domain_matrix[j][i]) < cur_domain_len:
 
 					cur_domain_len = len(self.domain_matrix[j][i])
