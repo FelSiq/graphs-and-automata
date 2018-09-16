@@ -2,7 +2,8 @@ import copy
 
 """
 	NxN Sudoku solver using Domain Reduction technique + 
-	Smallest Domain First Heuristic.
+	Smallest Domain First Heuristic +
+	Domain Reduction Propagation Heuristic
 
 	An application of CSP (Constraint Satisfaction Problem).
 """
