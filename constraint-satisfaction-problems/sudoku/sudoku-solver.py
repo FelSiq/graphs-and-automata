@@ -2,7 +2,8 @@ import copy
 
 """
 	NxN Sudoku solver using Domain Reduction technique + 
-	Smallest Domain First Heuristic +
+	Minimum Remaining Value (MRV): Choose the varible with
+		the current smallest domain.
 	Domain Reduction Propagation Heuristic
 
 	An application of CSP (Constraint Satisfaction Problem).
@@ -83,7 +84,7 @@ class Sudoku:
 					self.domain_matrix[j][i].update({value})
 
 
-	def __smallest_domain_id__(self):
+	def __minimum_remaining_val_id__(self):
 		x = self.invalid_val
 		y = self.invalid_val
 
@@ -105,7 +106,7 @@ class Sudoku:
 		for value in self.domain_matrix[y][x]:
 			self.__set_position__(value, x, y)
 
-			new_x, new_y = self.__smallest_domain_id__()
+			new_x, new_y = self.__minimum_remaining_val_id__()
 
 			if self.__recursive_fill__(new_x, new_y):
 				return True
@@ -164,7 +165,7 @@ class Sudoku:
 		# of the game board
 		self.__dom_init_check__()
 
-		x, y = self.__smallest_domain_id__()
+		x, y = self.__minimum_remaining_val_id__()
 
 		return self.__recursive_fill__(x, y)
 
