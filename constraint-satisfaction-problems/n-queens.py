@@ -78,16 +78,19 @@ if __name__ == "__main__":
 	import sys
 
 	if len(sys.argv) < 2:
-		print("usage:", sys.argv[0], "<n>")
+		print("usage:", sys.argv[0], "[n - default to 8]")
 		exit(1)
 
 	try:
 		n = int(sys.argv[1])
 		if n <= 0:
+			print("Warning: \"n\" must be a positive integer")
+			raise Exception
+		if n in {2, 3}:
+			print("Warning: \"n\" can't be neither 2 nor 3!")
 			raise Exception
 	except:
-		print("Error: \"n\" must be a positive integer")
-		exit(2)
+		n = 8
 
 	Queens(n).print()
 	
