@@ -1,0 +1,18 @@
+d
+v 0
+v 1
+v 2
+e 0 1 2.0
+e 1 2 3.5
+e 0 2 7.0
+
+# Domain identifier. Any character sequence can
+# separate the domain values, but it must be spe-
+# cified correctly during the file read.
+o 0 1,2,3,4
+o 1 1,3,4
+o 2 1,2
+
+# Repeated domain specifications will be unified
+# with previous one using Union (set operator)
+o 0 5
