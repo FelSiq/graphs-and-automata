@@ -23,6 +23,9 @@ class Graph:
 		if v_b not in self.transit_mat:
 			self.transit_mat[v_b] = {}
 
+		if w is None or type(w) != type(float):
+			w = 1.0
+
 		self.transit_mat[v_a][v_b] = float(w)
 		if not self.directed:
 			self.transit_mat[v_b][v_a] = float(w)

@@ -5,9 +5,11 @@ class DomainGraph(Graph):
 	def __init__(self, filepath=None, sep=","):
 		super().__init__(filepath=filepath)
 
+		self.value = {}
 		self.domain = {}
 		for vertex in self.transit_mat:
 			self.domain[vertex] = set()
+			self.value[vertex] = None
 
 		if filepath:
 			self.__filldomain__(filepath, sep)
@@ -39,18 +41,36 @@ class DomainGraph(Graph):
 			be created and a WARNING will be given.
 		"""
 
+		"""
+			Value specification format fostered:
+			(input file format)
+			
+			a <vertex identifier> <value>
+			
+			Where "value" may be any symbol, preferably from given vertex 
+			domain. If not, this may lead to inconsistencies, and is the
+			user responsibility to prevent this.
+		"""
+
 		re_domain = re.compile(r"""
 			\s*[Oo]		# Get the domain "o" identifier
 			\s*([^\s]+)	# Get the vertex identifier
 			\s*(.+)		# Get the domain values separated by "sep"
 			""", re.VERBOSE)
 
+		re_value = re.compile(r"""
+			\s*[Aa]		# Get the value "a" identifier
+			\s*([^\s]+)	# Get the vertex identifier
+			\s*([^\s]+)	# Get the vertex value
+			""", re.VERBOSE)
+
 		with open(filepath) as f:
 			for line in f:
-				match = re_domain.match(line)
-				if match:
-					vertex_id = match.group(1)
-					domain_vals = match.group(2).split(sep=sep)
+				match_domain = re_domain.match(line)
+				match_value = re_value.match(line)
+				if match_domain:
+					vertex_id = match_domain.group(1)
+					domain_vals = match_domain.group(2).split(sep=sep)
 
 					if vertex_id not in self.domain:
 						print("WARNING: vertex \"" + vertex_id + \
@@ -58,6 +78,14 @@ class DomainGraph(Graph):
 						self.domain[vertex_id] = set()
 
 					self.domain[vertex_id].update(set(domain_vals))
+
+				elif match_value:
+					vertex_id = match_value.group(1)
+					value = match_value.group(2)
+					if vertex_id not in self.domain or value not in self.domain[vertex_id]:
+						print("WARNING: value \"" + value + \
+							"\" is not in vertex \"" + vertex_id + "\" domain.")
+					self.value[vertex_id] = value
 
 if __name__ == "__main__":
 	import sys
