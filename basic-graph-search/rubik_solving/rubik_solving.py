@@ -8,13 +8,38 @@ class Rubik:
 		self.config = None
 		self.COLORS = ("W", "Y", "G", "R", "B", "O")
 		self.solution = []
+		self.__addrmat = None
 
 		if filepath is not None:
 			self.read_file(filepath, sep=None)
+			self.__buildaddressmat__()
 
-		if self.config is not None:
-			#self.__buildaddressmat__()
-			pass
+	def __buildaddressmat__(self):
+		
+		if self.config is None:
+			return
+
+		self.__addrmat = {}
+
+		for color in self.COLORS:
+			self.__addrmat[color] = array([[i] * 5 for i in range(5)])
+
+	def __matrot__(self, color, clockwise=True):
+		"""
+			Rotates a 5x5 matrix pi/2 radians (or 90 degrees)
+			clockwise or counter-clockwise.
+		"""
+		aux_mat = array([[None] * 5 for _ in range(5)])
+		mat = self.__addrmat[color]
+
+		for i in range(5):
+			for j in range(5):
+				if clockwise:
+					aux_mat[j, 4-i] = mat[i, j]
+				else:
+					aux_mat[4-j, i] = mat[i, j]
+
+		self.__addrmat[color] = aux_mat
 
 	def read_file(self, filepath, sep=None):
 		"""
@@ -116,3 +141,5 @@ if __name__ == "__main__":
 
 	print("\nStep-by-step Solution:")
 	r.print_sol()
+
+	r.__matrot__("W", True)
