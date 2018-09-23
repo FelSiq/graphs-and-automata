@@ -174,11 +174,14 @@ class Rubik:
 	
 	def __heuristiccost__(self):
 		# The heuristic cost is the number of pieces
-		# currently at the wrong position. 
+		# currently at the wrong position, divided by 12
+		# to turn it into a admissible heuristic (because
+		# a single movement can scramble up to 12 pieces in
+		# the worst-case scenario).
 		cost = 0.0
 		for color in self.COLORS:
 			cost += (self.config[color] != color).sum()
-		return cost
+		return cost / 12.0
 
 	def __recoverstate__(self, moves):
 		# Reverse to current state to START STATE
@@ -250,15 +253,11 @@ class Rubik:
 			if end == "\n":
 				counter = (counter + 1) % 3
 
-		return
-
 	def print_sol(self):
 		i = 1
-		for step in self.solution:
-			print(i, "\t:", step)
+		for color, direction in self.solution:
+			print(i, "\t:", color, "->" if direction else "<-")
 			i += 1
-
-		return
 
 if __name__ == "__main__":
 	import sys
@@ -281,11 +280,19 @@ if __name__ == "__main__":
 	r.__matrot__("Y", True)
 	r.__matrot__("Y", True)
 	r.__matrot__("O", False)
-	r.__matrot__("O", False)
+	r.__matrot__("R", True)
+	r.__matrot__("G", False)
+	#r.__matrot__("O", False)
+	#r.__matrot__("O", False)
 	r.__refreshstartstate__()
 
+	print("Loaded configuration:")
 	r.print()
+
+	print("Solving...")
 	r.solve()
+
+	print("After solving:")
 	r.print()
 
 	print("\nStep-by-step Solution:")
