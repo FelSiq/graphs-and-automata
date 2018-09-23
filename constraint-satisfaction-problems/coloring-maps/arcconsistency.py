@@ -39,7 +39,7 @@ class ArcConsistency(DomainGraph):
 			if self.value[neighbor] is None:
 				if self.domain[neighbor] == {value}:
 					self.__backtracking__(changes)
-					return False
+					return None
 
 				queue.append((start_vertex, neighbor))
 
@@ -81,6 +81,10 @@ class ArcConsistency(DomainGraph):
 
 		# Process of propagating constraints ended successfully
 		self.value[start_vertex] = value
+
+		# Remove given value just in case, due to backtracking possibilities
+		self.domain[start_vertex].remove(value)
+		changes.append((start_vertex, value))
 
 		# The reason for returning the changes are to enable future
 		# backtrackings, if necessary, in the next CSP iterations/states
