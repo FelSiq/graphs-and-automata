@@ -37,6 +37,38 @@ class Rubik:
 		cy = self.config["Y"]
 		cg = self.config["G"]
 
+		self.__addrmat["G"] = [
+			[[None], cw[0, 0], cw[1, 0], cw[2, 0], [None]],
+			[co[0, 2], cg[0, 0], cg[0, 1], cg[0, 2], cr[0, 0]],
+			[co[1, 2], cg[1, 0], cg[1, 1], cg[1, 2], cr[1, 0]],
+			[co[2, 2], cg[2, 0], cg[2, 1], cg[2, 2], cr[2, 0]],
+			[[None], cy[2, 0], cy[1, 0], cy[0, 0], [None]],
+		]
+
+		self.__addrmat["O"] = [
+			[[None], cw[0, 2], cw[0, 1], cw[0, 0], [None]],
+			[cb[0, 2], co[0, 0], co[0, 1], co[0, 2], cg[0, 0]],
+			[cb[1, 2], co[1, 0], co[1, 1], co[1, 2], cg[1, 0]],
+			[cb[2, 2], co[2, 0], co[2, 1], co[2, 2], cg[2, 0]],
+			[[None], cy[2, 0], cy[2, 1], cy[2, 2], [None]],
+		]
+
+		self.__addrmat["B"] = [
+			[[None], cw[2, 2], cw[1, 2], cw[0, 2], [None]],
+			[cr[0, 2], cb[0, 0], cb[0, 1], cb[0, 2], co[0, 0]],
+			[cr[1, 2], cb[1, 0], cb[1, 1], cb[1, 2], co[1, 0]],
+			[cr[2, 2], cb[2, 0], cb[2, 1], cb[2, 2], co[2, 0]],
+			[[None], cy[0, 2], cy[1, 2], cy[2, 2], [None]],
+		]
+
+		self.__addrmat["Y"] = [
+			[[None], cr[2, 0], cr[2, 1], cr[2, 2], [None]],
+			[cg[2, 2], cy[0, 0], cy[0, 1], cy[0, 2], cb[2, 0]],
+			[cg[2, 1], cy[1, 0], cy[1, 1], cy[1, 2], cb[2, 1]],
+			[cg[2, 0], cy[2, 0], cy[2, 1], cy[2, 2], cb[2, 2]],
+			[[None], co[2, 2], co[2, 1], co[2, 0], [None]],
+		]
+
 		self.__addrmat["R"] = [
 			[[None], cw[2, 0], cw[2, 1], cw[2, 2], [None]],
 			[cg[0, 2], cr[0, 0], cr[0, 1], cr[0, 2], cb[0, 0]],
@@ -46,18 +78,10 @@ class Rubik:
 		]
 
 		self.__addrmat["W"] = [
-			[[None], co[0, 0], co[0, 1], co[0, 2], [None]],
-			[cg[0, 0], cw[0, 0], cw[0, 1], cw[0, 2], cb[0, 0]],
+			[[None], co[0, 2], co[0, 1], co[0, 0], [None]],
+			[cg[0, 0], cw[0, 0], cw[0, 1], cw[0, 2], cb[0, 2]],
 			[cg[0, 1], cw[1, 0], cw[1, 1], cw[1, 2], cb[0, 1]],
-			[cg[0, 2], cw[2, 0], cw[2, 1], cw[2, 2], cb[0, 2]],
-			[[None], cr[0, 0], cr[0, 1], cr[0, 2], [None]],
-		]
-
-		self.__addrmat["W"] = [
-			[[None], co[0, 0], co[0, 1], co[0, 2], [None]],
-			[cg[0, 0], cw[0, 0], cw[0, 1], cw[0, 2], cb[0, 0]],
-			[cg[0, 1], cw[1, 0], cw[1, 1], cw[1, 2], cb[0, 1]],
-			[cg[0, 2], cw[2, 0], cw[2, 1], cw[2, 2], cb[0, 2]],
+			[cg[0, 2], cw[2, 0], cw[2, 1], cw[2, 2], cb[0, 0]],
 			[[None], cr[0, 0], cr[0, 1], cr[0, 2], [None]],
 		]
 
@@ -205,6 +229,3 @@ if __name__ == "__main__":
 
 	print("\nStep-by-step Solution:")
 	r.print_sol()
-
-	r.__matrot__("W", False)
-	r.print()
