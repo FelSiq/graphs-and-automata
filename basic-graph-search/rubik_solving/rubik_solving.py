@@ -1,4 +1,6 @@
 from numpy import array
+from copy import deepcopy
+import heapq
 """
 	An application of A* algorithm.
 """
@@ -6,6 +8,7 @@ from numpy import array
 class Rubik:
 	def __init__(self, filepath=None, sep=None):
 		self.config = None
+		self.START_STATE = None
 		self.COLORS = ("W", "Y", "G", "R", "B", "O")
 		self.solution = []
 		self.__addrmat = None
@@ -112,7 +115,11 @@ class Rubik:
 			for j in range(5):
 				self.__addrmat[color][j][i][0] = aux_mat[i, j]
 
-		return
+
+	def __refreshstartstate__(self):
+		# Maintain a copy of the start state for backtracking
+		# purposes while running A*
+		self.START_STATE = deepcopy(self.config)
 
 	def read_file(self, filepath, sep=None):
 		"""
@@ -162,19 +169,63 @@ class Rubik:
 
 				self.config[color] = array(self.config[color])
 
-		return
-				
+			# Copy start state for backtracking purposes during A* execution
+			self.__refreshstartstate__()
+	
+	def __heuristiccost__(self):
+		# The heuristic cost is the number of pieces
+		# currently at the wrong position. 
+		cost = 0.0
+		for color in self.COLORS:
+			cost += (self.config[color] != color).sum()
+		return cost
+
+	def __recoverstate__(self, moves):
+		# Reverse to current state to START STATE
+		for color in self.COLORS:
+			for i in range(3):
+				for j in range(3):
+					self.config[color][i, j, 0] = self.START_STATE[color][i, j, 0]
+
+		# Redo all moves to get back to current state
+		for color, clockwise in moves:
+			self.__matrot__(color, clockwise)
 
 	def solve(self):
 		if self.config is None:
 			print("Error: no configuration loaded. Please use",
 				"Rubik.read_file(filepath) method to load",
 				"a input file")
-			return False
+			return None
 
 		"""
 			Apply A* here and find a solution.
 		"""
+
+		moves = []
+		minheap = [(0, self.__heuristiccost__(), moves)]
+		self.solution = []
+
+		while minheap:
+			total_cost, cur_hcost, moves = heapq.heappop(minheap)
+
+			if cur_hcost == 0:
+				# Found the solution
+				minheap = None
+				self.__recoverstate__(moves)
+				self.solution = moves
+			else:
+				# Generate all possible paths (2 moves/side * 6 sides = 12 moves)
+				for color in self.COLORS:
+					for clockwise in (True, False):
+						self.__recoverstate__(moves)
+						self.__matrot__(color, clockwise)
+						new_hcost = self.__heuristiccost__()
+						new_total_cost = new_hcost + total_cost + 1
+						heapq.heappush(minheap, 
+							(new_total_cost, new_hcost, 
+								moves + [(color, clockwise)]))
+		return self.solution
 
 	def print(self):
 		COLORS_PRINT_SEQ =\
@@ -213,7 +264,8 @@ if __name__ == "__main__":
 	import sys
 
 	if len(sys.argv) < 2:
-		print("usage:", sys.argv[0], "<filepath> [separator - default to None]")
+		print("usage:", sys.argv[0], 
+			"<filepath> [separator - default to None]")
 		exit(1)
 
 	try:
@@ -223,9 +275,18 @@ if __name__ == "__main__":
 
 	r = Rubik(sys.argv[1], sep)
 
-	r.print()
+	r.__matrot__("W", True)
+	r.__matrot__("R", False)
+	r.__matrot__("B", True)
+	r.__matrot__("Y", True)
+	r.__matrot__("Y", True)
+	r.__matrot__("O", False)
+	r.__matrot__("O", False)
+	r.__refreshstartstate__()
 
+	r.print()
 	r.solve()
+	r.print()
 
 	print("\nStep-by-step Solution:")
 	r.print_sol()
