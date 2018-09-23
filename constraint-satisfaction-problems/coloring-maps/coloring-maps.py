@@ -2,6 +2,7 @@ import sys
 sys.path.insert(0, "../../basic-graph-search/")
 
 from Graph.graph import Graph
+from arcconsistency import ArcConsistency
 
 """
 	Heuristics for CSP (Constraint Satisfaction Problems):
@@ -54,7 +55,84 @@ from Graph.graph import Graph
 			Consistency"
 """
 
-class Map(Graph):
-	def color()
+class Map(ArcConsistency):
+	def __curstateissolution__(self):
+		# Check if all variables has a value AND if
+		# all values are consistent (in this case, no
+		# vertex can have the same color of other adjacent
+		# vertex).
+
+	def __nextvariable__(self):
+		# Apply MVR (choose the variable with the smallest
+		# current domain), and use DH (variable with highest
+		# number of constraints) to tie-breaker for MRV.
+
+	def __nextvalue__(self, variable):
+		# Apply LCV to find the best value of "variable's"
+		# Domain to apply. As mentioned above, the LCV heurist
+		# choose the value which less affect adjacent vertex
+		# domains (under the constraint graph perspective).
+		# Therefore, the choosen value mantains the highest
+		# flexibility over the CSP path to solution, speeding
+		# up the solution search.
+
+	def __undochanges__(self, changes_list):
+		# Backtracking: undo all changes if change list
+		# Changes are in format (vertex, value removed)
+	
+
+	def paint(self):
+		changes = []
+		no_solution = False
+
+		while not self.__curstateissolution__() and not no_solution:
+			var = self.__nextvariable__() # Apply MRV + DH
+			value = self.__nextvalue__(var) # Apply LCV + FC
+
+			if not value:
+				# Domain's empty or no possible values
+				# to apply to current var w/o getting
+				# into a inconsistent state. Then, back-
+				# track the last consistent change made
+				if changes:
+					self.__undochanges__(changes.pop())
+				else:
+					no_solution = True
+			else:
+				# Run Arc Consistency algorithm
+				new_changes = self.checkConsistency(var, value)
+
+				# Check if Arc Consistency FAILED
+				if new_changes is None:
+					# ArcConsistency failed, therefore backtrack
+					if changes:
+						self.__undochanges__(changes.pop())
+					else:
+						no_solution = True
+				else:
+					# Arc consistency succeed. Add change list
+					# into changes list due to a possible future
+					# backtracking
+					changes.append((new_changes,))
+
+		# End of coloring maps CSP
+		return self.value
+			
 
 if __name__ == "__main__":
+	import sys
+	if len(sys.argv) < 2:
+		print("usage:", sys.argv[0], 
+			"<filepath> [separator - default is \",\"]")
+		exit(1)
+
+	try:
+		sep = sys.argv[2]
+	except:
+		sep = ","
+
+	m = Map(filepath=sys.argv[1], sep=sep)
+
+	m.print_graph()
+
+	print("Solution:", m.paint())
