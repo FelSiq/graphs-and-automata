@@ -21,8 +21,47 @@ class Rubik:
 
 		self.__addrmat = {}
 
-		for color in self.COLORS:
-			self.__addrmat[color] = array([[i] * 5 for i in range(5)])
+		"""
+			Mapping here (last step to finally apply A* and solve...)
+			     [ O ]
+			     [ B ]
+			[ W ][ R ][ Y ]
+			     [ G ]
+		"""
+
+		# Aux variable to reduce code verbosity level
+		cb = self.config["B"]
+		cr = self.config["R"]
+		co = self.config["O"]
+		cw = self.config["W"]
+		cy = self.config["Y"]
+		cg = self.config["G"]
+
+		self.__addrmat["R"] = [
+			[[None], cw[2, 0], cw[2, 1], cw[2, 2], [None]],
+			[cg[0, 2], cr[0, 0], cr[0, 1], cr[0, 2], cb[0, 0]],
+			[cg[1, 2], cr[1, 0], cr[1, 1], cr[1, 2], cb[1, 0]],
+			[cg[2, 2], cr[2, 0], cr[2, 1], cr[2, 2], cb[2, 0]],
+			[[None], cy[0, 0], cy[0, 1], cy[0, 2], [None]],
+		]
+
+		self.__addrmat["W"] = [
+			[[None], co[0, 0], co[0, 1], co[0, 2], [None]],
+			[cg[0, 0], cw[0, 0], cw[0, 1], cw[0, 2], cb[0, 0]],
+			[cg[0, 1], cw[1, 0], cw[1, 1], cw[1, 2], cb[0, 1]],
+			[cg[0, 2], cw[2, 0], cw[2, 1], cw[2, 2], cb[0, 2]],
+			[[None], cr[0, 0], cr[0, 1], cr[0, 2], [None]],
+		]
+
+		self.__addrmat["W"] = [
+			[[None], co[0, 0], co[0, 1], co[0, 2], [None]],
+			[cg[0, 0], cw[0, 0], cw[0, 1], cw[0, 2], cb[0, 0]],
+			[cg[0, 1], cw[1, 0], cw[1, 1], cw[1, 2], cb[0, 1]],
+			[cg[0, 2], cw[2, 0], cw[2, 1], cw[2, 2], cb[0, 2]],
+			[[None], cr[0, 0], cr[0, 1], cr[0, 2], [None]],
+		]
+
+		return
 
 	def __matrot__(self, color, clockwise=True):
 		"""
@@ -34,12 +73,22 @@ class Rubik:
 
 		for i in range(5):
 			for j in range(5):
+				# Choosen the position + deference 
+				# pointer (last "0" index)
 				if clockwise:
-					aux_mat[j, 4-i] = mat[i, j]
+					aux_mat[j, 4-i] = mat[j][i][0]
 				else:
-					aux_mat[4-j, i] = mat[i, j]
+					aux_mat[4-j, i] = mat[j][i][0]
 
-		self.__addrmat[color] = aux_mat
+		# Change the values of the configuration via the
+		# addrmat pointers. The main idea is that, as we are
+		# using pointers, the values will be correctly updated
+		# in every cube's face.
+		for i in range(5):
+			for j in range(5):
+				self.__addrmat[color][j][i][0] = aux_mat[i, j]
+
+		return
 
 	def read_file(self, filepath, sep=None):
 		"""
@@ -85,7 +134,11 @@ class Rubik:
 					# Each element must be a data structure to
 					# simulate a pointer, as the address (and not
 					# the value) will be necessary to make moves
-					self.config[color].append([(elem,) for elem in line])
+					self.config[color].append([[elem] for elem in line])
+
+				self.config[color] = array(self.config[color])
+
+		return
 				
 
 	def solve(self):
@@ -94,6 +147,10 @@ class Rubik:
 				"Rubik.read_file(filepath) method to load",
 				"a input file")
 			return False
+
+		"""
+			Apply A* here and find a solution.
+		"""
 
 	def print(self):
 		COLORS_PRINT_SEQ =\
@@ -111,15 +168,22 @@ class Rubik:
 		for color in COLORS_PRINT_SEQ:
 			offset = " " * (6 if color in {"O", "B", "G"} else 0)
 			end = "\n" if color in ("O", "B", "Y", "G") else " "
+
 			print(offset, " ".join(map(lambda k: str(k[0]), 
-				self.config[color][counter])), sep="", end=end)
-			counter = (counter + 1) % 3
+				self.config[color][counter,:])), sep="", end=end)
+
+			if end == "\n":
+				counter = (counter + 1) % 3
+
+		return
 
 	def print_sol(self):
 		i = 1
 		for step in self.solution:
 			print(i, "\t:", step)
 			i += 1
+
+		return
 
 if __name__ == "__main__":
 	import sys
@@ -142,4 +206,5 @@ if __name__ == "__main__":
 	print("\nStep-by-step Solution:")
 	r.print_sol()
 
-	r.__matrot__("W", True)
+	r.__matrot__("W", False)
+	r.print()
