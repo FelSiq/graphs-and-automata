@@ -3,6 +3,7 @@ sys.path.insert(0, "../../basic-graph-search/")
 
 from Graph.graph import Graph
 from arcconsistency import ArcConsistency
+import heapq
 
 """
 	Heuristics for CSP (Constraint Satisfaction Problems):
@@ -61,11 +62,35 @@ class Map(ArcConsistency):
 		# all values are consistent (in this case, no
 		# vertex can have the same color of other adjacent
 		# vertex).
+		for vertex in self.value:
+			if self.value[vertex] is None:
+				return False
+
+			for adj_vertex in self.transit_matrix[vertex]:
+				if self.value[adj_vertex] is None or \
+					self.value[adj_vertex] == self.value[vertex]:
+					return False
+		return True
 
 	def __nextvariable__(self):
 		# Apply MVR (choose the variable with the smallest
 		# current domain), and use DH (variable with highest
 		# number of constraints) to tie-breaker for MRV.
+
+		# Construct a MIN-HEAP which uses the domain size (MRV) as main key
+		# and the NEGATIVE count of adjacent vertexes of a given vertex
+		# as a tie-breaker (DH). In the worst-case scenario, the vertex will 
+		# be chosen alphabetically.
+		domain_sizes = heapq.heapify([(
+			len(self.domain[v]), -len(self.transit_matrix[v]), v) 
+			for v in self.value])
+
+		for domain_size, neg_const_count, var in domain_sizes:
+			# The "domain_size == 0" thing isn't this function business.
+
+			if self.value[var] is None and domain_size > 0:
+				return ret_var
+		return None
 
 	def __nextvalue__(self, variable):
 		# Apply LCV to find the best value of "variable's"
@@ -74,12 +99,53 @@ class Map(ArcConsistency):
 		# domains (under the constraint graph perspective).
 		# Therefore, the choosen value mantains the highest
 		# flexibility over the CSP path to solution, speeding
-		# up the solution search.
+		# up the solution search. Also, it is a good idead to
+		# apply FC heuristic here too, which verificates when
+		# the selected value is the single possible value to
+		# some adjacent vertex and, therefore, can not be attri-
+		# buted consistently to the current variable.
+
+		sorted_vals = []
+		for val in self.domain[variable]:
+			forward_checking = True
+			count_val_neighbor = 0
+
+			for neighbor in self.transit_mat[variable]:
+				if val in self.domain[neighbor]:
+					count_val_neighbor += 1
+
+					# Apply FC
+					if self.domain[neighbor] == {val}:
+						forward_checking = False
+						break
+
+			# If is safe the attribution of current value...
+			if forward_checking:
+				sorted_vals.append((count_val_neighbors, val))
+
+		if sorted_vals:
+			# Sort values and pick based on LCV Heuristic
+			sorted_vals.sort(lambda k : k[0])
+			return sorted_vals.pop()[1]
+
+		return None
 
 	def __undochanges__(self, changes_list):
 		# Backtracking: undo all changes if change list
 		# Changes are in format (vertex, value removed)
-	
+		for vertex, rem_value in changes_list:
+			self.domain[vertex].update({rem_value})
+
+		# The last value is a bit problematic, as it is
+		# the bad attribution that caused all of this
+		# backtracking thing, therefore is a bad idea
+		# undo it. However, on the future backtracks,
+		# this attribution may not be that bad and can
+		# even be part of the answer, so it is not safe
+		# to just remove that value from the correspondent
+		# vertex, too.
+
+		...
 
 	def paint(self):
 		changes = []
@@ -99,7 +165,8 @@ class Map(ArcConsistency):
 				else:
 					no_solution = True
 			else:
-				# Run Arc Consistency algorithm
+				# Run Arc Consistency algorithm + attribution
+				# if everything went just right
 				new_changes = self.checkConsistency(var, value)
 
 				# Check if Arc Consistency FAILED
