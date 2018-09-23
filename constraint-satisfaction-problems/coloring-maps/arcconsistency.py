@@ -1,5 +1,5 @@
 import sys
-sys.path.insert(0, "../basic-graph-search/Graph")
+sys.path.insert(0, "../../basic-graph-search/Graph")
 
 from domgraph import DomainGraph
 import copy
@@ -24,7 +24,7 @@ class ArcConsistency(DomainGraph):
 			vertex, val = change
 			self.domain[vertex].update({val})
 
-	def solve(self, start_vertex, value, ret_changes=True):
+	def checkConsistency(self, start_vertex, value, ret_changes=True):
 		"""
 			Run Arc Consistency algorithm.
 		"""
@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
 	ac.refreshDomain()
 
-	changes = ac.solve(sys.argv[2], sys.argv[3])
+	changes = ac.checkConsistency(sys.argv[2], sys.argv[3])
 
 	print("\nValues:")
 	for vertex in ac.value:
