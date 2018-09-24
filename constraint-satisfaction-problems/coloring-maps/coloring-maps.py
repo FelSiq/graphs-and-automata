@@ -66,7 +66,7 @@ class Map(ArcConsistency):
 			if self.value[vertex] is None:
 				return False
 
-			for adj_vertex in self.transit_matrix[vertex]:
+			for adj_vertex in self.transit_mat[vertex]:
 				if self.value[adj_vertex] is None or \
 					self.value[adj_vertex] == self.value[vertex]:
 					return False
@@ -81,18 +81,20 @@ class Map(ArcConsistency):
 		# and the NEGATIVE count of adjacent vertexes of a given vertex
 		# as a tie-breaker (DH). In the worst-case scenario, the vertex will 
 		# be chosen alphabetically.
-		domain_sizes = heapq.heapify([(
-			len(self.domain[v]), -len(self.transit_matrix[v]), v) 
-			for v in self.value])
+		domain_sizes = [(
+			len(self.domain[v]), -len(self.transit_mat[v]), v) 
+			for v in self.value]
+
+		heapq.heapify(domain_sizes)
 
 		for domain_size, neg_const_count, var in domain_sizes:
 			# The "domain_size == 0" thing isn't this function business.
 
 			if self.value[var] is None and domain_size > 0:
-				return ret_var
+				return var
 		return None
 
-	def __nextvalue__(self, variable):
+	def __listvalsbylcv__(self, variable):
 		# Apply LCV to find the best value of "variable's"
 		# Domain to apply. As mentioned above, the LCV heurist
 		# choose the value which less affect adjacent vertex
@@ -121,12 +123,12 @@ class Map(ArcConsistency):
 
 			# If is safe the attribution of current value...
 			if forward_checking:
-				sorted_vals.append((count_val_neighbors, val))
+				sorted_vals.append((count_val_neighbor, val))
 
 		if sorted_vals:
-			# Sort values and pick based on LCV Heuristic
-			sorted_vals.sort(lambda k : k[0])
-			return sorted_vals.pop()[1]
+			# Sort values to pick based on LCV (+ FC) Heuristic(s)
+			sorted_vals.sort(key = lambda k : k[0])
+			return [val[1] for val in sorted_vals]
 
 		return None
 
@@ -136,51 +138,41 @@ class Map(ArcConsistency):
 		for vertex, rem_value in changes_list:
 			self.domain[vertex].update({rem_value})
 
-		# The last value is a bit problematic, as it is
-		# the bad attribution that caused all of this
-		# backtracking thing, therefore is a bad idea
-		# undo it. However, on the future backtracks,
-		# this attribution may not be that bad and can
-		# even be part of the answer, so it is not safe
-		# to just remove that value from the correspondent
-		# vertex, too.
-
-		...
-
 	def paint(self):
 		changes = []
-		no_solution = False
+		activated_vertexes = []
 
-		while not self.__curstateissolution__() and not no_solution:
-			var = self.__nextvariable__() # Apply MRV + DH
-			value = self.__nextvalue__(var) # Apply LCV + FC
-
-			if not value:
-				# Domain's empty or no possible values
-				# to apply to current var w/o getting
-				# into a inconsistent state. Then, back-
-				# track the last consistent change made
-				if changes:
-					self.__undochanges__(changes.pop())
-				else:
-					no_solution = True
+		while not self.__curstateissolution__():
+			if not activated_vertexes:
+				var = self.__nextvariable__() # Apply MRV + DH
+				values = self.__listvalsbylcv__(var) # Apply LCV + FC
 			else:
-				# Run Arc Consistency algorithm + attribution
-				# if everything went just right
-				new_changes = self.checkConsistency(var, value)
+				# Recovery from a backtracking
+				var, values = activated_vertexes.pop()
 
-				# Check if Arc Consistency FAILED
-				if new_changes is None:
-					# ArcConsistency failed, therefore backtrack
-					if changes:
-						self.__undochanges__(changes.pop())
-					else:
-						no_solution = True
-				else:
-					# Arc consistency succeed. Add change list
-					# into changes list due to a possible future
-					# backtracking
-					changes.append((new_changes,))
+			attribution = False
+			while values:
+				val = values.pop()
+				# Guaranteed consistent attribution +
+				# Arc Consistency (Constraint propagation 
+				# algorithm) execution
+				new_changes = self.consistentAttrib(var, val)
+
+				# If attribution was successfully...
+				if new_changes is not None:
+					# Store the changes made, break "while" loop
+					# and signal out that a attribution was made.
+					# Also, store current state (variable, cur_domain)
+					# in case of backtracking.
+					changes.append(new_changes)
+					attribution = True
+					activated_vertexes.append((var, values))
+					values = []
+
+			# If no attribution was successful 
+			# with current variable, bracktrack.
+			if not attribution:
+				self.__undochanges__(changes.pop())
 
 		# End of coloring maps CSP
 		return self.value
@@ -202,4 +194,8 @@ if __name__ == "__main__":
 
 	m.print_graph()
 
-	print("Solution:", m.paint())
+	ans = m.paint()
+
+	print("\nSolution:")
+	for vertex in ans:
+		print(vertex, "\t:", ans[vertex])

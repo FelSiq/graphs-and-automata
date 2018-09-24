@@ -1,0 +1,30 @@
+# Australian example map
+
+# Vertexes
+V WA
+V NT
+V SA
+V Q
+V NSW
+V V
+V T
+
+# Edges
+E WA NT
+E WA SA
+E NT SA 
+E NT Q
+E SA Q
+E Q NSW
+E SA NSW
+E NSW V
+E SA V
+
+# Domain values
+o WA R,G,B
+o NT R,G,B
+o SA R,G,B
+o Q R,G,B
+o NSW R,G,B
+o V R,G,B
+o T R,G,B

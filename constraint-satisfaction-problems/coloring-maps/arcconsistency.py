@@ -24,7 +24,7 @@ class ArcConsistency(DomainGraph):
 			vertex, val = change
 			self.domain[vertex].update({val})
 
-	def checkConsistency(self, start_vertex, value, ret_changes=True):
+	def consistentAttrib(self, start_vertex, value, ret_changes=True):
 		"""
 			Run Arc Consistency algorithm.
 		"""
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
 	ac.refreshDomain()
 
-	changes = ac.checkConsistency(sys.argv[2], sys.argv[3])
+	changes = ac.consistentAttrib(sys.argv[2], sys.argv[3])
 
 	print("\nValues:")
 	for vertex in ac.value:
