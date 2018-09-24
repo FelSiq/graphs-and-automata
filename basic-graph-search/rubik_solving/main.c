@@ -2,17 +2,20 @@
 #include <rubik.h>
 
 int main(int argc, char *const argv[]) {
-	if (argc < ARGSNUM) {
+	if (argc < ARGV_ARGSNUM - 1) {
 		printf("usage: %s <filepath>"
-			" [separator - default to \",\"]\n", argv[PROGNAME]);
+			" [separator - default to \",\"]\n", argv[ARGV_PROGNAME]);
 		return 1;
 	}
 	
-	char sep = ",";
+	char *sep = NULL;
 	if (argc == 2)
-		sep = argv[SEPARATOR];
+		sep = argv[ARGV_SEPARATOR];
 
-	if ((const rubik *r = rubik_create(argv[FILEPATH], sep)) == NULL)
+	rubik *r = rubik_create(argv[ARGV_FILEPATH], 
+		(sep != NULL ? sep : ","));
+
+	if (r == NULL) {
 		printf("Error: something went wrong"
 			" when loading cube configuration.\n");
 		return 2;
