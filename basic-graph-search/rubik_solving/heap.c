@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include <heap.h>
 
 typedef struct {
@@ -8,7 +10,7 @@ typedef struct {
 struct heap_struct {
 	heap_node *heap;
 	unsigned long int size;
-}
+};
 
 heap *heap_start() {
 	heap *h = malloc(sizeof(heap));
@@ -18,8 +20,13 @@ heap *heap_start() {
 	}
 	return h;
 }
-void *heap_pop(heap *h);
-void heap_push(heap *h, float key, void *item);
+void *heap_pop(heap *h) {
+	return NULL;
+}
+
+void heap_push(heap *h, float key, void *item) {
+
+}
 
 void heap_destroy(heap **h) {
 	if (h != NULL && *h != NULL) {

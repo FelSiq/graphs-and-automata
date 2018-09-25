@@ -115,6 +115,37 @@ static void __mat_rot__(
 	}
 }
 
+#if DEBUG == 1
+	static void __print_pointer_mat__(color_type *mat[5][5]) {
+		for (int row = 0; row < 5; row++){
+			for (int col = 0; col < 5; col++) {
+				printf("%c ", *mat[row][col]);
+			}
+			printf("\n");
+		}
+	}
+
+	static void __rotation_test__(rubik *r) {
+		for (unsigned char color = 0; color < COLOR_NUM; color++) {
+			printf("Color: %d\n", color);
+			__print_pointer_mat__(r->p_c[color]);
+			for (unsigned char i = 0; i < 4; i++) {
+				printf("Rotation -> %d:\n", i+1);
+				__mat_rot__(r, color, DIR_CLKWISE, 1);
+				__print_pointer_mat__(r->p_c[color]);
+			}
+			for (unsigned char i = 0; i < 4; i++) {
+				printf("Rotation <- %d:\n", i+1);
+				__mat_rot__(r, color, DIR_C_CLKWISE, 1);
+				__print_pointer_mat__(r->p_c[color]);
+			}
+			printf("After all rotations:\n");
+			__print_pointer_mat__(r->p_c[color]);
+			printf("End of color %d\n", color);
+		}
+	}
+#endif
+
 rubik *rubik_create(char *const restrict filepath) {
 	rubik *r = NULL;
 
@@ -145,32 +176,29 @@ rubik *rubik_create(char *const restrict filepath) {
 		__build_pointer_matrix__(r);
 	} 
 
+	#if DEBUG == 1
+		__rotation_test__(r);
+	#endif
+	__mat_rot__(r, C_R, DIR_C_CLKWISE, 1);
+	__mat_rot__(r, C_W, DIR_C_CLKWISE, 1);
+
 	return r;
 }
 
 int rubik_print(const rubik *const restrict r) {
 	if (r != NULL) {
 
-		register unsigned char i, row, col, color;
-
-		for (color = 0; color < 6; color++) {
-			printf("Color: %d\n", color);
-			for (row = 0; row < 3; row++) {
-				for (col = 0; col < 3; col++)
-					printf("%c", r->config[color][row][col]);
-				printf("\n");
-			}
-		}
+		register unsigned char i, row = 0, col, color;
 
 		const char offset[] = "      ";
 		for (i = 0; i < sizeof(PRINT_COLOR_SEQ)/sizeof(char); i++) {
 			color = (int) PRINT_COLOR_SEQ[i] - (int) '0';
 			printf("%s", (color == C_W || color == C_Y) ? offset : ""); 
-			for (col = 0; col < COL_NUM; col++) {
+			for (row = 0; row < ROW_NUM; row++) {
 				printf("%c ", r->config[color][row][col]);
 			}
 			printf("%c", PRINT_BREAKLINE[i]);
-			row = (row + PRINT_BREAKLINE[i] == '\n') % ROW_NUM;
+			col = (col + (PRINT_BREAKLINE[i] == '\n')) % COL_NUM;
 		}
 		printf("\n");
 		return 1;
