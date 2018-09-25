@@ -14,7 +14,7 @@ class Rubik:
 		self.__addrmat = None
 
 		if filepath is not None:
-			self.read_file(filepath, sep=None)
+			self.read_file(filepath, sep=sep)
 			self.__buildaddressmat__()
 
 	def __buildaddressmat__(self):
@@ -206,11 +206,11 @@ class Rubik:
 		"""
 
 		moves = []
-		minheap = [(0, self.__heuristiccost__(), moves)]
+		minheap = [(0, self.__heuristiccost__(), 0, moves)]
 		self.solution = []
 
 		while minheap:
-			total_cost, cur_hcost, moves = heapq.heappop(minheap)
+			total_cost, cur_hcost, cur_gcost, moves = heapq.heappop(minheap)
 
 			if cur_hcost == 0:
 				# Found the solution
@@ -224,9 +224,10 @@ class Rubik:
 						self.__recoverstate__(moves)
 						self.__matrot__(color, clockwise)
 						new_hcost = self.__heuristiccost__()
-						new_total_cost = new_hcost + total_cost + 1
+						new_gcost = cur_gcost + 1
+						new_total_cost = new_hcost + new_gcost
 						heapq.heappush(minheap, 
-							(new_total_cost, new_hcost, 
+							(new_total_cost, new_hcost, new_gcost,
 								moves + [(color, clockwise)]))
 		return self.solution
 
