@@ -37,7 +37,7 @@ enum {
 /* FUNCTION DECLARATIONS */
 rubik *rubik_create(char *const restrict filepath);
 int rubik_print(const rubik *const restrict r);
-int rubik_solve(const rubik *restrict r);
+int rubik_solve(rubik *restrict r);
 int rubik_solution(const rubik *const restrict r);
 int rubik_destroy(rubik **restrict r);
 

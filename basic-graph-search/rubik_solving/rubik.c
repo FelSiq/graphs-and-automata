@@ -2,60 +2,70 @@
 #include <stdio.h>
 #include <rubik.h>
 #include <string.h>
+#include <heap.h>
 
 struct rubik_struct {
 	color_type config[COLOR_NUM][ROW_NUM][COL_NUM],
-		*p_c[COLOR_NUM][ROW_NUM + 2][COL_NUM + 2];
-	unsigned char sol_size, *solution;
+		INITIAL_CONFIG[COLOR_NUM][ROW_NUM][COL_NUM],
+		*p_c[COLOR_NUM][ROW_NUM + 2][COL_NUM + 2],
+		aux_p_c[ROW_NUM + 2][COL_NUM + 2];
+	unsigned char sol_size, *solution, nil_pos;
 };
 
+typedef struct {
+	float hcost;
+	unsigned char gcost;
+	unsigned char *moves;
+} package;
+
 static void __build_pointer_matrix__(rubik *restrict r) {
+
 	color_type *p_G_mat[ROW_NUM + 2][COL_NUM + 2] = {
-		{NULL, &r->config[C_W][0][0], &r->config[C_W][1][0], &r->config[C_W][2][0], NULL},
-		{&r->config[C_O][0][2], &r->config[C_G][0][0], &r->config[C_G][0][1], &r->config[C_G][0][2], &r->config[C_R][0][0]},
-		{&r->config[C_O][1][2], &r->config[C_G][1][0], &r->config[C_G][1][1], &r->config[C_G][1][2], &r->config[C_R][1][0]},
-		{&r->config[C_O][2][2], &r->config[C_G][2][0], &r->config[C_G][2][1], &r->config[C_G][2][2], &r->config[C_R][2][0]},
-		{NULL, &r->config[C_Y][2][0], &r->config[C_Y][1][0], &r->config[C_Y][0][0], NULL},
+		{&r->nil_pos, &r->config[C_W][0][0], &r->config[C_W][0][1], &r->config[C_W][0][2], &r->nil_pos},
+		{&r->config[C_O][2][0], &r->config[C_G][0][0], &r->config[C_G][1][0], &r->config[C_G][2][0], &r->config[C_R][0][0]},
+		{&r->config[C_O][2][1], &r->config[C_G][0][1], &r->config[C_G][1][1], &r->config[C_G][2][1], &r->config[C_R][0][1]},
+		{&r->config[C_O][2][2], &r->config[C_G][0][2], &r->config[C_G][1][2], &r->config[C_G][2][2], &r->config[C_R][0][2]},
+		{&r->nil_pos, &r->config[C_Y][0][2], &r->config[C_Y][0][1], &r->config[C_Y][0][0], &r->nil_pos},
 	};
 
 	color_type *p_O_mat[ROW_NUM + 2][COL_NUM + 2] = {
-		{NULL, &r->config[C_W][0][2], &r->config[C_W][0][1], &r->config[C_W][0][0], NULL},
-		{&r->config[C_B][0][2], &r->config[C_O][0][0], &r->config[C_O][0][1], &r->config[C_O][0][2], &r->config[C_G][0][0]},
-		{&r->config[C_B][1][2], &r->config[C_O][1][0], &r->config[C_O][1][1], &r->config[C_O][1][2], &r->config[C_G][1][0]},
-		{&r->config[C_B][2][2], &r->config[C_O][2][0], &r->config[C_O][2][1], &r->config[C_O][2][2], &r->config[C_G][2][0]},
-		{NULL, &r->config[C_Y][2][0], &r->config[C_Y][2][1], &r->config[C_Y][2][2], NULL},
+		{&r->nil_pos, &r->config[C_W][2][0], &r->config[C_W][1][0], &r->config[C_W][0][0], &r->nil_pos},
+		{&r->config[C_B][2][0], &r->config[C_O][0][0], &r->config[C_O][1][0], &r->config[C_O][2][0], &r->config[C_G][0][0]},
+		{&r->config[C_B][2][1], &r->config[C_O][0][1], &r->config[C_O][1][1], &r->config[C_O][2][1], &r->config[C_G][0][1]},
+		{&r->config[C_B][2][2], &r->config[C_O][0][2], &r->config[C_O][1][2], &r->config[C_O][2][2], &r->config[C_G][0][2]},
+		{&r->nil_pos, &r->config[C_Y][0][2], &r->config[C_Y][1][2], &r->config[C_Y][2][2], &r->nil_pos},
 	};
 
 	color_type *p_B_mat[ROW_NUM + 2][COL_NUM + 2] = {
-		{NULL, &r->config[C_W][2][2], &r->config[C_W][1][2], &r->config[C_W][0][2], NULL},
-		{&r->config[C_R][0][2], &r->config[C_B][0][0], &r->config[C_B][0][1], &r->config[C_B][0][2], &r->config[C_O][0][0]},
-		{&r->config[C_R][1][2], &r->config[C_B][1][0], &r->config[C_B][1][1], &r->config[C_B][1][2], &r->config[C_O][1][0]},
-		{&r->config[C_R][2][2], &r->config[C_B][2][0], &r->config[C_B][2][1], &r->config[C_B][2][2], &r->config[C_O][2][0]},
-		{NULL, &r->config[C_Y][0][2], &r->config[C_Y][1][2], &r->config[C_Y][2][2], NULL},
+		{&r->nil_pos, &r->config[C_W][2][2], &r->config[C_W][2][1], &r->config[C_W][2][0], &r->nil_pos},
+		{&r->config[C_R][2][0], &r->config[C_B][0][0], &r->config[C_B][1][0], &r->config[C_B][2][0], &r->config[C_O][0][0]},
+		{&r->config[C_R][2][1], &r->config[C_B][0][1], &r->config[C_B][1][1], &r->config[C_B][2][1], &r->config[C_O][0][1]},
+		{&r->config[C_R][2][2], &r->config[C_B][0][2], &r->config[C_B][1][2], &r->config[C_B][2][2], &r->config[C_O][0][2]},
+		{&r->nil_pos, &r->config[C_Y][2][0], &r->config[C_Y][2][1], &r->config[C_Y][2][2], &r->nil_pos},
 	};
 
 	color_type *p_Y_mat[ROW_NUM + 2][COL_NUM + 2] = {
-		{NULL, &r->config[C_R][2][0], &r->config[C_R][2][1], &r->config[C_R][2][2], NULL},
-		{&r->config[C_G][2][2], &r->config[C_Y][0][0], &r->config[C_Y][0][1], &r->config[C_Y][0][2], &r->config[C_B][2][0]},
-		{&r->config[C_G][2][1], &r->config[C_Y][1][0], &r->config[C_Y][1][1], &r->config[C_Y][1][2], &r->config[C_B][2][1]},
-		{&r->config[C_G][2][0], &r->config[C_Y][2][0], &r->config[C_Y][2][1], &r->config[C_Y][2][2], &r->config[C_B][2][2]},
-		{NULL, &r->config[C_O][2][2], &r->config[C_O][2][1], &r->config[C_O][2][0], NULL},
+		{&r->nil_pos, &r->config[C_R][0][2], &r->config[C_R][1][2], &r->config[C_R][2][2], &r->nil_pos},
+		{&r->config[C_G][2][2], &r->config[C_Y][0][0], &r->config[C_Y][1][0], &r->config[C_Y][2][0], &r->config[C_B][0][2]},
+		{&r->config[C_G][1][2], &r->config[C_Y][0][1], &r->config[C_Y][1][1], &r->config[C_Y][2][1], &r->config[C_B][1][2]},
+		{&r->config[C_G][0][2], &r->config[C_Y][0][2], &r->config[C_Y][1][2], &r->config[C_Y][2][2], &r->config[C_B][2][2]},
+		{&r->nil_pos, &r->config[C_O][2][2], &r->config[C_O][1][2], &r->config[C_O][0][2], &r->nil_pos},
 	};
 
 	color_type *p_R_mat[ROW_NUM + 2][COL_NUM + 2] = {
-		{NULL, &r->config[C_W][2][0], &r->config[C_W][2][1], &r->config[C_W][2][2], NULL},
-		{&r->config[C_G][0][2], &r->config[C_R][0][0], &r->config[C_R][0][1], &r->config[C_R][0][2], &r->config[C_B][0][0]},
-		{&r->config[C_G][1][2], &r->config[C_R][1][0], &r->config[C_R][1][1], &r->config[C_R][1][2], &r->config[C_B][1][0]},
-		{&r->config[C_G][2][2], &r->config[C_R][2][0], &r->config[C_R][2][1], &r->config[C_R][2][2], &r->config[C_B][2][0]},
-		{NULL, &r->config[C_Y][0][0], &r->config[C_Y][0][1], &r->config[C_Y][0][2], NULL},
+		{&r->nil_pos, &r->config[C_W][0][2], &r->config[C_W][1][2], &r->config[C_W][2][2], &r->nil_pos},
+		{&r->config[C_G][2][0], &r->config[C_R][0][0], &r->config[C_R][1][0], &r->config[C_R][2][0], &r->config[C_B][0][0]},
+		{&r->config[C_G][2][1], &r->config[C_R][0][1], &r->config[C_R][1][1], &r->config[C_R][2][1], &r->config[C_B][0][1]},
+		{&r->config[C_G][2][2], &r->config[C_R][0][2], &r->config[C_R][1][2], &r->config[C_R][2][2], &r->config[C_B][0][2]},
+		{&r->nil_pos, &r->config[C_Y][0][0], &r->config[C_Y][1][0], &r->config[C_Y][2][0], &r->nil_pos},
 	};
 
 	color_type *p_W_mat[ROW_NUM + 2][COL_NUM + 2] = {
-		{NULL, &r->config[C_O][0][2], &r->config[C_O][0][1], &r->config[C_O][0][0], NULL},
-		{&r->config[C_G][0][0], &r->config[C_W][0][0], &r->config[C_W][0][1], &r->config[C_W][0][2], &r->config[C_B][0][2]},
-		{&r->config[C_G][0][1], &r->config[C_W][1][0], &r->config[C_W][1][1], &r->config[C_W][1][2], &r->config[C_B][0][1]},
-		{&r->config[C_G][0][2], &r->config[C_W][2][0], &r->config[C_W][2][1], &r->config[C_W][2][2], &r->config[C_B][0][0]},
-		{NULL, &r->config[C_R][0][0], &r->config[C_R][0][1], &r->config[C_R][0][2], NULL},
+		{&r->nil_pos, &r->config[C_O][2][0], &r->config[C_O][1][0], &r->config[C_O][0][0], &r->nil_pos},
+		{&r->config[C_G][0][0], &r->config[C_W][0][0], &r->config[C_W][1][0], &r->config[C_W][2][0], &r->config[C_B][2][0]},
+		{&r->config[C_G][1][0], &r->config[C_W][0][1], &r->config[C_W][1][1], &r->config[C_W][2][1], &r->config[C_B][1][0]},
+		{&r->config[C_G][2][0], &r->config[C_W][0][2], &r->config[C_W][1][2], &r->config[C_W][2][2], &r->config[C_B][0][0]},
+		{&r->nil_pos, &r->config[C_R][0][0], &r->config[C_R][1][0], &r->config[C_R][2][0], &r->nil_pos},
 	};
 
 	memcpy(r->p_c[C_W], p_W_mat, sizeof(p_W_mat));
@@ -64,6 +74,45 @@ static void __build_pointer_matrix__(rubik *restrict r) {
 	memcpy(r->p_c[C_R], p_R_mat, sizeof(p_R_mat));
 	memcpy(r->p_c[C_B], p_B_mat, sizeof(p_B_mat));
 	memcpy(r->p_c[C_O], p_O_mat, sizeof(p_O_mat));
+}
+
+inline static float __heuristic_cost__(rubik const *const restrict r) {
+	float h_cost = 0.0;
+
+	unsigned char color, row, col;
+	for (color = 0; color < COLOR_NUM; color++)
+		for (row = 0; row < ROW_NUM; row++)
+			for (col = 0; col < COL_NUM; col++)
+				h_cost += r->config[color][row][col] != COLOR_SEQ[color];
+
+	// This is roughly an division by 12
+	return h_cost * 0.0834;
+}
+
+static void __mat_rot__(
+	rubik *restrict r, 
+	unsigned char color_id, 
+	unsigned char clockwise,
+	char times) {
+
+	unsigned char row, col;
+	while (times-- > 0) {
+		for (row = 0; row < ROW_NUM + 2; row++) {
+			for (col = 0; col < COL_NUM + 2; col++) {
+				if (clockwise == DIR_CLKWISE) {
+					r->aux_p_c[row][4 - col] = *r->p_c[color_id][col][row];
+				} else {
+					r->aux_p_c[4 - row][col] = *r->p_c[color_id][col][row];
+				}
+			}
+		}
+
+		for (row = 0; row < ROW_NUM + 2; row++) {
+			for (col = 0; col < COL_NUM + 2; col++) {
+				*r->p_c[color_id][row][col] = r->aux_p_c[row][col];
+			}
+		}
+	}
 }
 
 rubik *rubik_create(char *const restrict filepath) {
@@ -89,6 +138,9 @@ rubik *rubik_create(char *const restrict filepath) {
 
 		fclose(input_f);
 
+		// Store a copy of the initial configuration
+		memcpy(r->INITIAL_CONFIG, r->config, sizeof(r->config));
+
 		// Build up pointer matrices
 		__build_pointer_matrix__(r);
 	} 
@@ -98,7 +150,18 @@ rubik *rubik_create(char *const restrict filepath) {
 
 int rubik_print(const rubik *const restrict r) {
 	if (r != NULL) {
+
 		register unsigned char i, row, col, color;
+
+		for (color = 0; color < 6; color++) {
+			printf("Color: %d\n", color);
+			for (row = 0; row < 3; row++) {
+				for (col = 0; col < 3; col++)
+					printf("%c", r->config[color][row][col]);
+				printf("\n");
+			}
+		}
+
 		const char offset[] = "      ";
 		for (i = 0; i < sizeof(PRINT_COLOR_SEQ)/sizeof(char); i++) {
 			color = (int) PRINT_COLOR_SEQ[i] - (int) '0';
@@ -115,10 +178,61 @@ int rubik_print(const rubik *const restrict r) {
 	return 0;
 }
 
-int rubik_solve(const rubik *restrict r) {
-	if (r == NULL)
-		return 0;
-	return 1;
+static void __recover_state__(const rubik *restrict r, 
+	unsigned char const *restrict const moves) {
+
+}
+
+int rubik_solve(rubik *restrict r) {
+	if (r == NULL) {
+		register package *cur_item, *new_item;
+		heap *minheap = heap_start();
+
+		register unsigned char not_completed = 1, color;
+		while (not_completed) {
+			cur_item = heap_pop(minheap);
+			// Recover the configuration of popped snapshot
+			__recover_state__(r, cur_item->moves);
+			
+			if (cur_item->hcost > 0.0) {
+				for (color = 0; color < COLOR_NUM; color++) {
+					// Clockwise movements
+					__mat_rot__(r, color, DIR_CLKWISE, 1);
+					new_item = malloc(sizeof(package));
+					new_item->hcost = __heuristic_cost__(r);
+					new_item->gcost = cur_item->gcost + 1;
+					new_item->moves = malloc(sizeof(char) * new_item->gcost);
+					memcpy(new_item->moves, cur_item->moves, cur_item->gcost);
+					new_item->moves[new_item->gcost - 1] = color & DIR_CLKWISE;
+					heap_push(minheap, new_item->hcost + new_item->gcost, new_item);
+
+					// Counter-clockwise movements
+					__mat_rot__(r, color, DIR_C_CLKWISE, 2);
+					new_item = malloc(sizeof(package));
+					new_item->hcost = __heuristic_cost__(r);
+					new_item->gcost = cur_item->gcost + 1;
+					new_item->moves = malloc(sizeof(char) * new_item->gcost);
+					memcpy(new_item->moves, cur_item->moves, cur_item->gcost);
+					new_item->moves[new_item->gcost - 1] = color & DIR_C_CLKWISE;
+					heap_push(minheap, new_item->hcost + new_item->gcost, new_item);
+
+					// Recover previous state
+					__mat_rot__(r, color, DIR_CLKWISE, 1);
+				}
+
+			} else {
+				not_completed = 0;
+				r->solution = cur_item->moves;
+				r->sol_size = strlen((char *) cur_item->moves);
+			}
+
+			free(cur_item);
+		}
+
+		heap_destroy(&minheap);
+		return 1;
+	}
+	return 0;
 }
 
 int rubik_solution(const rubik *const restrict r) {
