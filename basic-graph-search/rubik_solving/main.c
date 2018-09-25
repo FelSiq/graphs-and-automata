@@ -3,17 +3,11 @@
 
 int main(int argc, char *const argv[]) {
 	if (argc < ARGV_ARGSNUM - 1) {
-		printf("usage: %s <filepath>"
-			" [separator - default to \",\"]\n", argv[ARGV_PROGNAME]);
+		printf("usage: %s <filepath>", argv[ARGV_PROGNAME]);
 		return 1;
 	}
-	
-	char *sep = NULL;
-	if (argc == 2)
-		sep = argv[ARGV_SEPARATOR];
 
-	rubik *r = rubik_create(argv[ARGV_FILEPATH], 
-		(sep != NULL ? sep : ","));
+	rubik *r = rubik_create(argv[ARGV_FILEPATH]);
 
 	if (r == NULL) {
 		printf("Error: something went wrong"

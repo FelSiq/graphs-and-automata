@@ -1,9 +1,9 @@
 FLAGS = -Wall -I ./
-OUTPUT_FILE = rubik
+OUTPUT_FILE = rubik-solver
 
-all: main rubik
+all: main.tag rubik.tag
 	gcc -o $(OUTPUT_FILE) main.o rubik.o $(FLAGS) && rm *.o
-main:
+main.tag:
 	gcc -c main.c $(FLAGS)
-rubik:
+rubik.tag:
 	gcc -c rubik.c $(FLAGS)
