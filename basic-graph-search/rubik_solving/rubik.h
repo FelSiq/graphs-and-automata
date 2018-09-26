@@ -18,9 +18,9 @@
 #define C_B 		0b00000100
 #define C_O 		0b00000101
 #define DIR_CLKWISE 	0b00000000
-#define DIR_C_CLKWISE 	0b10000000
+#define DIR_C_CLKWISE 	0b01000000
 #define MASK_COL	0b00000111
-#define MASK_DIR 	0b10000000
+#define MASK_DIR 	0b01000000
 #define PRINT_COLOR_SEQ "000234523452345111"
 #define PRINT_BREAKLINE "\n\n\n\0\0\0\n\0\0\0\n\0\0\0\n\n\n\n" 
 
@@ -40,5 +40,9 @@ int rubik_print(const rubik *const restrict r);
 int rubik_solve(rubik *restrict r);
 int rubik_solution(const rubik *const restrict r);
 int rubik_destroy(rubik **restrict r);
+int rubik_reinit(rubik *restrict r);
+int rubik_rotate(rubik *restrict r, 
+	unsigned char const color, 
+	unsigned char const clockwise);
 
 #endif

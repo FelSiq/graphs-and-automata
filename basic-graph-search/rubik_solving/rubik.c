@@ -115,37 +115,6 @@ static void __mat_rot__(
 	}
 }
 
-#if DEBUG == 1
-	static void __print_pointer_mat__(color_type *mat[5][5]) {
-		for (int row = 0; row < 5; row++){
-			for (int col = 0; col < 5; col++) {
-				printf("%c ", *mat[row][col]);
-			}
-			printf("\n");
-		}
-	}
-
-	static void __rotation_test__(rubik *r) {
-		for (unsigned char color = 0; color < COLOR_NUM; color++) {
-			printf("Color: %d\n", color);
-			__print_pointer_mat__(r->p_c[color]);
-			for (unsigned char i = 0; i < 4; i++) {
-				printf("Rotation -> %d:\n", i+1);
-				__mat_rot__(r, color, DIR_CLKWISE, 1);
-				__print_pointer_mat__(r->p_c[color]);
-			}
-			for (unsigned char i = 0; i < 4; i++) {
-				printf("Rotation <- %d:\n", i+1);
-				__mat_rot__(r, color, DIR_C_CLKWISE, 1);
-				__print_pointer_mat__(r->p_c[color]);
-			}
-			printf("After all rotations:\n");
-			__print_pointer_mat__(r->p_c[color]);
-			printf("End of color %d\n", color);
-		}
-	}
-#endif
-
 rubik *rubik_create(char *const restrict filepath) {
 	rubik *r = NULL;
 
@@ -176,12 +145,6 @@ rubik *rubik_create(char *const restrict filepath) {
 		__build_pointer_matrix__(r);
 	} 
 
-	#if DEBUG == 1
-		__rotation_test__(r);
-	#endif
-	__mat_rot__(r, C_R, DIR_C_CLKWISE, 1);
-	__mat_rot__(r, C_W, DIR_C_CLKWISE, 1);
-
 	return r;
 }
 
@@ -206,21 +169,53 @@ int rubik_print(const rubik *const restrict r) {
 	return 0;
 }
 
-static void __recover_state__(const rubik *restrict r, 
+static void __recover_state__(rubik *restrict r, 
 	unsigned char const *restrict const moves) {
+	
+	// Recover initial position	
+	memcpy(r->config, r->INITIAL_CONFIG, sizeof(r->INITIAL_CONFIG));
 
+	// Redo all moves through current state
+	const register size_t move_count = strlen((char *) moves);
+	unsigned char color, clockwise;
+	for (register size_t i = 0; i < move_count; i++) {
+		color = moves[i] & MASK_COL;
+		clockwise = moves[i] & MASK_DIR;
+		__mat_rot__(r, color, clockwise, 1);
+	}
 }
 
 int rubik_solve(rubik *restrict r) {
-	if (r == NULL) {
+	if (r != NULL) {
 		register package *cur_item, *new_item;
 		heap *minheap = heap_start();
 
 		register unsigned char not_completed = 1, color;
+
+		#ifdef DEBUG 
+			printf("[DEBUG] Started solving...\n");
+			register unsigned long int it_counter = 0;
+		#endif
+
+		new_item = malloc(sizeof(package));
+		new_item->hcost = __heuristic_cost__(r);
+		new_item->gcost = 0;
+		new_item->moves = malloc(sizeof(char));
+		*new_item->moves = '\0';
+		heap_push(minheap, 0.0, new_item);
+
 		while (not_completed) {
 			cur_item = heap_pop(minheap);
 			// Recover the configuration of popped snapshot
 			__recover_state__(r, cur_item->moves);
+
+			#if DEBUG
+				it_counter++;
+				printf("%lu\t: hcost %lf gcost %d color %c dir %d\n", 
+					it_counter, cur_item->hcost, cur_item->gcost, 
+					COLOR_SEQ[cur_item->moves[cur_item->gcost] & MASK_COL], 
+					(cur_item->moves[cur_item->gcost] & MASK_DIR) == DIR_CLKWISE);
+			#endif
 			
 			if (cur_item->hcost > 0.0) {
 				for (color = 0; color < COLOR_NUM; color++) {
@@ -250,8 +245,12 @@ int rubik_solve(rubik *restrict r) {
 
 			} else {
 				not_completed = 0;
-				r->solution = cur_item->moves;
-				r->sol_size = strlen((char *) cur_item->moves);
+				r->sol_size = cur_item->gcost;
+				r->solution = malloc(sizeof(unsigned char) * r->sol_size);
+				memcpy(r->solution, cur_item->moves, r->sol_size);
+				#if DEBUG
+					printf("[DEBUG] solution size: %d\n", r->sol_size);
+				#endif
 			}
 
 			free(cur_item);
@@ -282,6 +281,25 @@ int rubik_destroy(rubik **restrict r) {
 	if (r != NULL && *r != NULL) {
 		free(*r);
 		*r = NULL;
+		return 1;
+	}
+	return 0;
+}
+
+int rubik_reinit(rubik *restrict r) {
+	if (r != NULL) {
+		return (memcpy(r->INITIAL_CONFIG, 
+			r->config, sizeof(r->config)) != NULL);
+	}
+	return 0;
+}
+
+int rubik_rotate(rubik *restrict r, 
+	unsigned char const color, 
+	unsigned char const clockwise) {
+
+	if (r != NULL) {
+		__mat_rot__(r, color, clockwise, 1);
 		return 1;
 	}
 	return 0;
