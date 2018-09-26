@@ -1,4 +1,4 @@
-FLAGS = -Wall -I ./ 
+FLAGS = -Wall -I ./ -DDEBUG -g
 OUTPUT_FILE = rubik-solver
 
 all: main.tag heap.tag rubik.tag
