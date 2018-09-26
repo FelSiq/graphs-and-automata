@@ -22,7 +22,7 @@
 #define MASK_COL	0b00000111
 #define MASK_DIR 	0b01000000
 #define PRINT_COLOR_SEQ "000234523452345111"
-#define PRINT_BREAKLINE "\n\n\n\0\0\0\n\0\0\0\n\0\0\0\n\n\n\n" 
+#define PRINT_BREAKLINE "\n\n\n\0\0\0\n\0\0\0\n\0\0\0\n\n\n\n"
 
 typedef unsigned char color_type;
 typedef struct rubik_struct rubik;
