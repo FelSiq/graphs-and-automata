@@ -15,5 +15,6 @@ heap *heap_start();
 void *heap_pop(heap *h);
 void heap_push(heap *h, float key, void *item);
 void heap_destroy(heap **h);
+unsigned long int heap_size(heap const *restrict h);
 
 #endif

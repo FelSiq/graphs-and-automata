@@ -151,14 +151,14 @@ rubik *rubik_create(char *const restrict filepath) {
 int rubik_print(const rubik *const restrict r) {
 	if (r != NULL) {
 
-		register unsigned char i, row = 0, col, color;
+		register unsigned char i, row = 0, col = 0, color;
 
 		const char offset[] = "      ";
-		for (i = 0; i < sizeof(PRINT_COLOR_SEQ)/sizeof(char); i++) {
+		for (i = 0; i < sizeof(PRINT_COLOR_SEQ)/sizeof(char)-1; i++) {
 			color = (int) PRINT_COLOR_SEQ[i] - (int) '0';
 			printf("%s", (color == C_W || color == C_Y) ? offset : ""); 
 			for (row = 0; row < ROW_NUM; row++) {
-				printf("%c ", r->config[color][row][col]);
+				printf("%c ", r->config[col][row][col]);
 			}
 			printf("%c", PRINT_BREAKLINE[i]);
 			col = (col + (PRINT_BREAKLINE[i] == '\n')) % COL_NUM;
@@ -259,6 +259,7 @@ int rubik_solve(rubik *restrict r) {
 					__mat_rot__(r, color, DIR_CLKWISE, 1);
 				}
 
+
 			} else {
 				not_completed = 0;
 				r->sol_size = cur_item->gcost;
@@ -267,8 +268,15 @@ int rubik_solve(rubik *restrict r) {
 				#if DEBUG
 					printf("[DEBUG] solution size: %d\n", r->sol_size);
 				#endif
+
+				for (register unsigned long i = heap_size(minheap); i; i--) {
+					new_item = heap_pop(minheap);
+					free(new_item->moves);
+					free(new_item);
+				}
 			}
 
+			free(cur_item->moves);
 			free(cur_item);
 		}
 
@@ -295,6 +303,8 @@ int rubik_solution(const rubik *const restrict r) {
 
 int rubik_destroy(rubik **restrict r) {
 	if (r != NULL && *r != NULL) {
+		if ((*r)->solution)
+			free((*r)->solution);
 		free(*r);
 		*r = NULL;
 		return 1;

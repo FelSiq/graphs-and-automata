@@ -99,15 +99,22 @@ void heap_push(heap *h, float key, void *item) {
 void heap_destroy(heap **h) {
 	if (h != NULL && *h != NULL) {
 		if ((*h)->heap != NULL) {
-			//while ((*h)->size--) {
-			//	if ((*h)->heap[(*h)->size].item != NULL)
-			//		free((*h)->heap[(*h)->size].item);
-			//}
+			while ((*h)->size--) {
+				if ((*h)->heap[(*h)->size].item != NULL)
+					free((*h)->heap[(*h)->size].item);
+			}
 			free((*h)->heap);
 		}
 		free(*h);
 		*h = NULL;
 	}
+}
+
+unsigned long int heap_size(heap const *restrict h) {
+	if (h != NULL) {
+		return h->size;
+	}
+	return 0;
 }
 
 #if HEAP_DEBUG == 1
