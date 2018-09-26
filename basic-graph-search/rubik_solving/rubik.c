@@ -13,7 +13,6 @@ struct rubik_struct {
 };
 
 typedef struct {
-	float hcost;
 	unsigned char gcost;
 	unsigned char *moves;
 } package;
@@ -158,7 +157,7 @@ int rubik_print(const rubik *const restrict r) {
 			color = (int) PRINT_COLOR_SEQ[i] - (int) '0';
 			printf("%s", (color == C_W || color == C_Y) ? offset : ""); 
 			for (row = 0; row < ROW_NUM; row++) {
-				printf("%c ", r->config[col][row][col]);
+				printf("%c ", r->config[color][row][col]);
 			}
 			printf("%c", PRINT_BREAKLINE[i]);
 			col = (col + (PRINT_BREAKLINE[i] == '\n')) % COL_NUM;
@@ -190,7 +189,10 @@ int rubik_solve(rubik *restrict r) {
 		register package *cur_item, *new_item;
 		heap *minheap = heap_start();
 
-		register unsigned char not_completed = 1, color;
+		register unsigned char not_completed = 1, 
+			color, not_found_solution = 1;
+
+		register float new_heuristic_cost;
 
 		#ifdef DEBUG 
 			printf("[DEBUG] Started solving...\n");
@@ -199,11 +201,13 @@ int rubik_solve(rubik *restrict r) {
 		#endif
 
 		new_item = malloc(sizeof(package));
-		new_item->hcost = __heuristic_cost__(r);
 		new_item->gcost = 0;
 		new_item->moves = malloc(sizeof(char));
 		*new_item->moves = '\0';
 		heap_push(minheap, 0.0, new_item);
+
+		if (__heuristic_cost__(r) <= 0.0)
+			not_completed = 0;
 
 		while (not_completed
 			#ifdef DEBUG
@@ -222,17 +226,20 @@ int rubik_solve(rubik *restrict r) {
 					(cur_item->moves[cur_item->gcost] & MASK_DIR) == DIR_CLKWISE);
 			#endif
 			
-			if (cur_item->hcost > 0.0) {
+			if (not_found_solution) {
+				not_found_solution = 1;
 				for (color = 0; color < COLOR_NUM; color++) {
 					// Clockwise movements
 					__mat_rot__(r, color, DIR_CLKWISE, 1);
 					new_item = malloc(sizeof(package));
-					new_item->hcost = __heuristic_cost__(r);
 					new_item->gcost = cur_item->gcost + 1;
 					new_item->moves = malloc(sizeof(unsigned char) * new_item->gcost);
 					memcpy(new_item->moves, cur_item->moves, cur_item->gcost);
 					new_item->moves[cur_item->gcost] = color | DIR_CLKWISE;
-					heap_push(minheap, new_item->hcost + new_item->gcost, new_item);
+					new_heuristic_cost = __heuristic_cost__(r);
+					heap_push(minheap, new_heuristic_cost + new_item->gcost, new_item);
+					not_found_solution &= (new_heuristic_cost > 0.0);
+
 					#ifdef DEBUG
 						printf("[DEBUG] Pushed color %c dir %d\n", 
 							COLOR_SEQ[color], 
@@ -242,12 +249,13 @@ int rubik_solve(rubik *restrict r) {
 					// Counter-clockwise movements
 					__mat_rot__(r, color, DIR_C_CLKWISE, 2);
 					new_item = malloc(sizeof(package));
-					new_item->hcost = __heuristic_cost__(r);
 					new_item->gcost = cur_item->gcost + 1;
 					new_item->moves = malloc(sizeof(unsigned char) * new_item->gcost);
 					memcpy(new_item->moves, cur_item->moves, cur_item->gcost);
 					new_item->moves[cur_item->gcost] = color | DIR_C_CLKWISE;
-					heap_push(minheap, new_item->hcost + new_item->gcost, new_item);
+					new_heuristic_cost = __heuristic_cost__(r);
+					heap_push(minheap, new_heuristic_cost + new_item->gcost, new_item);
+					not_found_solution &= (new_heuristic_cost > 0.0);
 
 					#ifdef DEBUG
 						printf("[DEBUG] Pushed color %c dir %d\n", 

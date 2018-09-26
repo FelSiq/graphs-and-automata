@@ -39,7 +39,9 @@ void *heap_pop(heap *h) {
 	h->heap[0] = h->heap[cur_size];
 	h->heap[cur_size] = aux;
 
-	h->heap = realloc(h->heap, sizeof(heap_node) * cur_size);
+	// Don't want to lose performance for just few bytes
+	// that will probably be used afterwards
+	//h->heap = realloc(h->heap, sizeof(heap_node) * cur_size);
 
 	// Downgrade "new head node" to its respective place
 	while (lchild_index < cur_size) {
