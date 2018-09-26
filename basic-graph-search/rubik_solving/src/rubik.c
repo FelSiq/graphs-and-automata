@@ -79,13 +79,18 @@ inline static float __heuristic_cost__(rubik const *const restrict r) {
 	float h_cost = 0.0;
 
 	unsigned char color, row, col;
-	for (color = 0; color < COLOR_NUM; color++)
-		for (row = 0; row < ROW_NUM; row++)
-			for (col = 0; col < COL_NUM; col++)
-				h_cost += r->config[color][row][col] != COLOR_SEQ[color];
-
+	register unsigned char cur_pos_color;
+	for (color = 0; color < COLOR_NUM; color++) {
+		for (row = 0; row < ROW_NUM; row++) {
+			for (col = 0; col < COL_NUM; col++) {
+				cur_pos_color = r->config[color][row][col];
+				h_cost += (cur_pos_color != COLOR_SEQ[color]) + 
+					OPPOSITE_COLORS(cur_pos_color, color);
+			}
+		}
+	}
 	// This is roughly an division by 12
-	return h_cost * 0.0834;
+	return h_cost * 0.083334;
 }
 
 static void __mat_rot__(
@@ -131,8 +136,8 @@ rubik *rubik_create(char *const restrict filepath) {
 
 			for (color = 0; color < COLOR_NUM; color++)
 				for (row = 0; row < ROW_NUM; row++)
-					for (col = 0; col < COL_NUM; col++)
-						fscanf(input_f, "%c%*c", &r->config[color][row][col]);
+					for (col = 0; col < COL_NUM && 
+						fscanf(input_f, "%c%*c", &r->config[color][row][col]); col++);
 		}
 
 		fclose(input_f);
