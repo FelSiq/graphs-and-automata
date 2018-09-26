@@ -15,16 +15,16 @@ int main(int argc, char *const argv[]) {
 		return 2;
 	}
 
-	#if DEBUG
+	#if INIT_CONFIG
 		rubik_rotate(r, C_W, DIR_CLKWISE);
 		rubik_rotate(r, C_R, DIR_C_CLKWISE);
 		rubik_rotate(r, C_B, DIR_CLKWISE);
-		//rubik_rotate(r, C_Y, DIR_CLKWISE);
-		//rubik_rotate(r, C_Y, DIR_CLKWISE);
-		//rubik_rotate(r, C_O, DIR_C_CLKWISE);
-		//rubik_rotate(r, C_R, DIR_CLKWISE);
-		//rubik_rotate(r, C_G, DIR_C_CLKWISE);
-		//rubik_rotate(r, C_O, DIR_C_CLKWISE);
+		rubik_rotate(r, C_Y, DIR_CLKWISE);
+		rubik_rotate(r, C_Y, DIR_CLKWISE);
+		rubik_rotate(r, C_O, DIR_C_CLKWISE);
+		rubik_rotate(r, C_R, DIR_CLKWISE);
+		rubik_rotate(r, C_G, DIR_C_CLKWISE);
+		rubik_rotate(r, C_O, DIR_C_CLKWISE);
 		//rubik_rotate(r, C_O, DIR_C_CLKWISE);
 		rubik_reinit(r);
 	#endif

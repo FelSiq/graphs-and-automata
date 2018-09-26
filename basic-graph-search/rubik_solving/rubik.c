@@ -170,15 +170,15 @@ int rubik_print(const rubik *const restrict r) {
 }
 
 static void __recover_state__(rubik *restrict r, 
-	unsigned char const *restrict const moves) {
+	unsigned char const *restrict const moves, 
+	unsigned char const moves_count) {
 	
 	// Recover initial position	
 	memcpy(r->config, r->INITIAL_CONFIG, sizeof(r->INITIAL_CONFIG));
 
 	// Redo all moves through current state
-	const register size_t move_count = strlen((char *) moves);
 	unsigned char color, clockwise;
-	for (register size_t i = 0; i < move_count; i++) {
+	for (register size_t i = 0; i < moves_count; i++) {
 		color = moves[i] & MASK_COL;
 		clockwise = moves[i] & MASK_DIR;
 		__mat_rot__(r, color, clockwise, 1);
@@ -195,6 +195,7 @@ int rubik_solve(rubik *restrict r) {
 		#ifdef DEBUG 
 			printf("[DEBUG] Started solving...\n");
 			register unsigned long int it_counter = 0;
+			register unsigned long int max_it_counter = 6;
 		#endif
 
 		new_item = malloc(sizeof(package));
@@ -204,14 +205,18 @@ int rubik_solve(rubik *restrict r) {
 		*new_item->moves = '\0';
 		heap_push(minheap, 0.0, new_item);
 
-		while (not_completed) {
+		while (not_completed
+			#ifdef DEBUG
+				&& (max_it_counter <= 0 || it_counter < max_it_counter)
+			#endif
+		) {
 			cur_item = heap_pop(minheap);
 			// Recover the configuration of popped snapshot
-			__recover_state__(r, cur_item->moves);
+			__recover_state__(r, cur_item->moves, cur_item->gcost);
 
 			#if DEBUG
 				it_counter++;
-				printf("%lu\t: hcost %lf gcost %d color %c dir %d\n", 
+				printf("[DEBUG] %lu\t: hcost %lf gcost %d color %c dir %d\n", 
 					it_counter, cur_item->hcost, cur_item->gcost, 
 					COLOR_SEQ[cur_item->moves[cur_item->gcost] & MASK_COL], 
 					(cur_item->moves[cur_item->gcost] & MASK_DIR) == DIR_CLKWISE);
@@ -224,20 +229,31 @@ int rubik_solve(rubik *restrict r) {
 					new_item = malloc(sizeof(package));
 					new_item->hcost = __heuristic_cost__(r);
 					new_item->gcost = cur_item->gcost + 1;
-					new_item->moves = malloc(sizeof(char) * new_item->gcost);
+					new_item->moves = malloc(sizeof(unsigned char) * new_item->gcost);
 					memcpy(new_item->moves, cur_item->moves, cur_item->gcost);
-					new_item->moves[new_item->gcost - 1] = color & DIR_CLKWISE;
+					new_item->moves[cur_item->gcost] = color | DIR_CLKWISE;
 					heap_push(minheap, new_item->hcost + new_item->gcost, new_item);
+					#ifdef DEBUG
+						printf("[DEBUG] Pushed color %c dir %d\n", 
+							COLOR_SEQ[color], 
+							new_item->moves[cur_item->gcost] & MASK_DIR);
+					#endif
 
 					// Counter-clockwise movements
 					__mat_rot__(r, color, DIR_C_CLKWISE, 2);
 					new_item = malloc(sizeof(package));
 					new_item->hcost = __heuristic_cost__(r);
 					new_item->gcost = cur_item->gcost + 1;
-					new_item->moves = malloc(sizeof(char) * new_item->gcost);
+					new_item->moves = malloc(sizeof(unsigned char) * new_item->gcost);
 					memcpy(new_item->moves, cur_item->moves, cur_item->gcost);
-					new_item->moves[new_item->gcost - 1] = color & DIR_C_CLKWISE;
+					new_item->moves[cur_item->gcost] = color | DIR_C_CLKWISE;
 					heap_push(minheap, new_item->hcost + new_item->gcost, new_item);
+
+					#ifdef DEBUG
+						printf("[DEBUG] Pushed color %c dir %d\n", 
+							COLOR_SEQ[color], 
+							new_item->moves[cur_item->gcost] & MASK_DIR);
+					#endif
 
 					// Recover previous state
 					__mat_rot__(r, color, DIR_CLKWISE, 1);
@@ -268,7 +284,7 @@ int rubik_solution(const rubik *const restrict r) {
 		for (register unsigned char i = 0; i < r->sol_size; i++) {
 			col = COLOR_SEQ[r->solution[i] & MASK_COL];
 			dir = r->solution[i] & MASK_DIR;
-			printf("%hhu\t: %hhu %s", i, col,
+			printf("%hhu\t: %c %s\n", i, col,
 				dir == DIR_CLKWISE ? "->" : "<-");
 		}
 
