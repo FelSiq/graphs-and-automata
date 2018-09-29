@@ -63,7 +63,7 @@ void *heap_pop(heap *h) {
 }
 
 void heap_push(heap *h, unsigned char *restrict key_and_move) {
-	const register unsigned long int cur_size = h->size;
+	register const unsigned long int cur_size = h->size;
 	register unsigned long int cur_position = cur_size;
 
 	h->heap = realloc(h->heap, sizeof(unsigned char *) * (cur_size + 1));

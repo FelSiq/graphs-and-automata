@@ -3,6 +3,18 @@
 
 /* TYPEDEF & DEFINE SECTION */
 
+// Enables use of IDA*. If false, use A*, which
+// consumes way too much memory.
+#define ENABLE_IDA_STAR 1
+
+#ifndef MIN
+	#define MIN(A, B) (((A) < (B)) ? (A) : (B))
+#endif
+
+#ifndef INFINITY
+	#define INFINITY 255
+#endif
+
 // Number of sides of the cube
 // Note that the code will mainly focus on solving a
 // 3x3x3 Rubik's cube

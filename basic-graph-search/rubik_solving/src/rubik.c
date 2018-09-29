@@ -2,7 +2,12 @@
 #include <stdio.h>
 #include <rubik.h>
 #include <string.h>
-#include <heap.h>
+
+#if ENABLE_IDA_STAR
+	#include <stack.h>
+#else
+	#include <heap.h>
+#endif
 
 struct rubik_struct {
 	color_type config[COLOR_NUM][ROW_NUM][COL_NUM],
@@ -13,8 +18,12 @@ struct rubik_struct {
 };
 
 enum {
-	PACK_HEAPKEY,
-	PACK_GCOST=sizeof(float),
+	#if ENABLE_IDA_STAR
+		PACK_GCOST,
+	#else
+		PACK_HEAPKEY,
+		PACK_GCOST=sizeof(float),
+	#endif
 	PACK_MOVES,
 	PACK_SIZE
 };
@@ -92,7 +101,7 @@ inline static float __heuristic_cost__(rubik const *const restrict r) {
 		}
 	}
 	// This is roughly an division by 12
-	return h_cost * 0.08334;
+	return h_cost * 0.083334;
 }
 
 static void __mat_rot__(
@@ -191,80 +200,136 @@ static inline void __recover_state__(rubik *restrict r,
 	}
 }
 
+static unsigned char *__empty_move__() {
+	unsigned char *new_item = malloc(PACK_SIZE * sizeof(unsigned char));
+
+	#if ENABLE_IDA_STAR == 0
+		new_item[PACK_HEAPKEY] = 0.0;
+	#endif
+
+	new_item[PACK_GCOST] = 0;
+	new_item[PACK_MOVES] = '\0';
+
+	return new_item;
+}
+
 int rubik_solve(rubik *restrict r) {
 	if (r != NULL) {
-		register unsigned char *cur_item, *new_item;
-		heap *minheap = heap_start();
-
-		register unsigned char not_completed = 1, 
-			color, not_found_solution = 1;
-
+		const unsigned char DIR_SEQ[] = {DIR_CLKWISE, DIR_C_CLKWISE, DIR_CLKWISE};
 		register float new_heuristic_cost;
-		float *aux_h_pointer;
+		register unsigned char *cur_item, 
+			*new_item = __empty_move__(), 
+			not_completed = 1, 
+			color, 
+			dir;
 
-		new_item = malloc(PACK_SIZE * sizeof(unsigned char));
-		new_item[PACK_HEAPKEY] = 0.0;
-		new_item[PACK_GCOST] = 0;
-		new_item[PACK_MOVES] = '\0';
-		heap_push(minheap, new_item);
+		#if ENABLE_IDA_STAR
+			stack *movestack = stack_start();
+			stack_push(movestack, new_item);
+			register float threshold = __heuristic_cost__(r), 
+				next_threshold = threshold;
+			float f_cost_total;
+		#else
+			heap *minheap = heap_start();
+			float *aux_h_pointer = (float *) new_item;
+			aux_h_pointer[PACK_HEAPKEY] = 0.0;
+			heap_push(minheap, new_item);
+		#endif
 
-		if (__heuristic_cost__(r) <= 0.0)
-			not_completed = 0;
+		if (
+		#if ENABLE_IDA_STAR
+			threshold
+		#else
+			__heuristic_cost__(r) 
+		#endif
+			<= 0.0) not_completed = 0;
 
 		while (not_completed) {
-			cur_item = heap_pop(minheap);
+			#if ENABLE_IDA_STAR
+				/*
+					IDA* is a IDDFS algorthm which uses the
+					"maximum deep" as some threshold for the
+					f_cost function of A*.
+				*/
+				if (stack_not_empty(movestack)) {
+					cur_item = stack_pop(movestack);
+				} else {
+					// Next IDDFS algorithm: init a empty
+					// move and update threshold
+					cur_item = __empty_move__();
+					threshold = next_threshold;
+					next_threshold = INFINITY;
+				}
+			#else
+				cur_item = heap_pop(minheap);
+			#endif
 
 			// Recover the configuration of popped snapshot
 			__recover_state__(r, cur_item);
 			
-			if (not_found_solution) {
-				not_found_solution = 1;
-				for (color = 0; color < COLOR_NUM; color++) {
-					// Clockwise movements
-					__mat_rot__(r, color, DIR_CLKWISE, 1);
-					new_item = malloc(sizeof(unsigned char) * (PACK_SIZE + cur_item[PACK_GCOST]));
-					new_item[PACK_GCOST] = cur_item[PACK_GCOST] + 1;
-					memcpy(new_item + PACK_MOVES, cur_item + PACK_MOVES, cur_item[PACK_GCOST]);
-					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_CLKWISE;
+			for (color = 0; (color < COLOR_NUM) && not_completed; color++) {
+				for (dir = 0; (dir < 2) && not_completed; dir++) {
+					__mat_rot__(r, color, DIR_SEQ[dir], 1);
 					new_heuristic_cost = __heuristic_cost__(r);
-					aux_h_pointer = (float *) new_item;
-					aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
-					heap_push(minheap, new_item);
-					not_found_solution &= (new_heuristic_cost > 0.0);
+					not_completed &= (new_heuristic_cost > 0.0);
 
-					// Counter-clockwise movements
-					__mat_rot__(r, color, DIR_C_CLKWISE, 2);
+					#if ENABLE_IDA_STAR
+						f_cost_total = new_heuristic_cost + cur_item[PACK_GCOST] + 1; 
+						if (f_cost_total <= threshold) {
+					#endif
+
 					new_item = malloc(sizeof(unsigned char) * (PACK_SIZE + cur_item[PACK_GCOST]));
 					new_item[PACK_GCOST] = cur_item[PACK_GCOST] + 1;
 					memcpy(new_item + PACK_MOVES, cur_item + PACK_MOVES, cur_item[PACK_GCOST]);
-					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_C_CLKWISE;
-					new_heuristic_cost = __heuristic_cost__(r);
-					aux_h_pointer = (float *) new_item;
-					aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
-					heap_push(minheap, new_item);
-					not_found_solution &= (new_heuristic_cost > 0.0);
+					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_SEQ[dir];
+					
+					#if ENABLE_IDA_STAR
+						stack_push(movestack, new_item);
+
+						} else {
+							next_threshold = MIN(next_threshold, f_cost_total);
+						}
+					#else
+						aux_h_pointer = (float *) new_item;
+						aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
+						heap_push(minheap, new_item);
+					#endif
 
 					// Recover previous state
-					__mat_rot__(r, color, DIR_CLKWISE, 1);
-				}
-
-
-			} else {
-				not_completed = 0;
-				r->sol_size = cur_item[PACK_GCOST];
-				r->solution = malloc(sizeof(unsigned char) * r->sol_size);
-				memcpy(r->solution, cur_item + PACK_MOVES, r->sol_size);
-
-				for (register unsigned long i = heap_size(minheap); i; i--) {
-					new_item = heap_pop(minheap);
-					free(new_item);
-				}
-			}
+					__mat_rot__(r, color, DIR_SEQ[dir + 1], 1);
+				} // End of DIR loop
+			} // End of COLOR loop
 
 			free(cur_item);
 		}
 
-		heap_destroy(&minheap);
+		#if ENABLE_IDA_STAR
+			cur_item = stack_pop(movestack);
+		#else
+			cur_item = heap_pop(minheap);
+		#endif
+
+		r->sol_size = cur_item[PACK_GCOST];
+		r->solution = malloc(sizeof(unsigned char) * r->sol_size);
+		memcpy(r->solution, cur_item + PACK_MOVES, r->sol_size);
+		free(cur_item);
+
+		#if ENABLE_IDA_STAR
+		while (stack_not_empty(movestack)) {
+			new_item = stack_pop(movestack);
+		#else
+		for (register unsigned long i = heap_size(minheap); i; i--) {
+			new_item = heap_pop(minheap);
+		#endif
+			free(new_item);
+		}
+
+		#if ENABLE_IDA_STAR
+			stack_destroy(&movestack);
+		#else
+			heap_destroy(&minheap);
+		#endif
+
 		return 1;
 	}
 	return 0;
@@ -276,7 +341,7 @@ int rubik_solution(const rubik *const restrict r) {
 		for (register unsigned char i = 0; i < r->sol_size; i++) {
 			col = COLOR_SEQ[r->solution[i] & MASK_COL];
 			dir = r->solution[i] & MASK_DIR;
-			printf("%hhu\t: %c %s\n", i, col,
+			printf("%hhu\t: %c %s\n", i + 1, col,
 				dir == DIR_CLKWISE ? "->" : "<-");
 		}
 
