@@ -13,8 +13,10 @@ struct rubik_struct {
 };
 
 enum {
-	PACK_GCOST,
-	PACK_MOVES
+	PACK_HEAPKEY,
+	PACK_GCOST=sizeof(float),
+	PACK_MOVES,
+	PACK_SIZE
 };
 
 static void __build_pointer_matrix__(rubik *restrict r) {
@@ -90,7 +92,7 @@ inline static float __heuristic_cost__(rubik const *const restrict r) {
 		}
 	}
 	// This is roughly an division by 12
-	return h_cost * 0.083334;
+	return h_cost * 0.08334;
 }
 
 static void __mat_rot__(
@@ -198,17 +200,13 @@ int rubik_solve(rubik *restrict r) {
 			color, not_found_solution = 1;
 
 		register float new_heuristic_cost;
+		float *aux_h_pointer;
 
-		#ifdef DEBUG 
-			printf("[DEBUG] Started solving...\n");
-			register unsigned long int it_counter = 0;
-			register unsigned long int max_it_counter = 6;
-		#endif
-
-		new_item = malloc(2 * sizeof(unsigned char));
+		new_item = malloc(PACK_SIZE * sizeof(unsigned char));
+		new_item[PACK_HEAPKEY] = 0.0;
 		new_item[PACK_GCOST] = 0;
 		new_item[PACK_MOVES] = '\0';
-		heap_push(minheap, 0.0, new_item);
+		heap_push(minheap, new_item);
 
 		if (__heuristic_cost__(r) <= 0.0)
 			not_completed = 0;
@@ -224,22 +222,26 @@ int rubik_solve(rubik *restrict r) {
 				for (color = 0; color < COLOR_NUM; color++) {
 					// Clockwise movements
 					__mat_rot__(r, color, DIR_CLKWISE, 1);
-					new_item = malloc(sizeof(unsigned char) * (2 + cur_item[PACK_GCOST]));
+					new_item = malloc(sizeof(unsigned char) * (PACK_SIZE + cur_item[PACK_GCOST]));
 					new_item[PACK_GCOST] = cur_item[PACK_GCOST] + 1;
 					memcpy(new_item + PACK_MOVES, cur_item + PACK_MOVES, cur_item[PACK_GCOST]);
 					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_CLKWISE;
 					new_heuristic_cost = __heuristic_cost__(r);
-					heap_push(minheap, new_heuristic_cost + new_item[PACK_GCOST], new_item);
+					aux_h_pointer = (float *) new_item;
+					aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
+					heap_push(minheap, new_item);
 					not_found_solution &= (new_heuristic_cost > 0.0);
 
 					// Counter-clockwise movements
 					__mat_rot__(r, color, DIR_C_CLKWISE, 2);
-					new_item = malloc(sizeof(unsigned char) * (2 + cur_item[PACK_GCOST]));
+					new_item = malloc(sizeof(unsigned char) * (PACK_SIZE + cur_item[PACK_GCOST]));
 					new_item[PACK_GCOST] = cur_item[PACK_GCOST] + 1;
 					memcpy(new_item + PACK_MOVES, cur_item + PACK_MOVES, cur_item[PACK_GCOST]);
 					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_C_CLKWISE;
 					new_heuristic_cost = __heuristic_cost__(r);
-					heap_push(minheap, new_heuristic_cost + new_item[PACK_GCOST], new_item);
+					aux_h_pointer = (float *) new_item;
+					aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
+					heap_push(minheap, new_item);
 					not_found_solution &= (new_heuristic_cost > 0.0);
 
 					// Recover previous state
