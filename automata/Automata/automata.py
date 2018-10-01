@@ -133,6 +133,28 @@ class Automaton:
 
 		return null_transitions
 
+	def __blindsearch__(self, start_state):
+		stack = [start_state]
+		visited_states = {start_state}
+
+		while stack:
+			cur_state = stack.pop()
+
+			for symbol in self.transit_matrix[cur_state]:
+				adj_vertex = self.transit_matrix[cur_state][symbol]
+
+				if adj_vertex and adj_vertex not in visited_states:
+					visited_states.update({adj_vertex})
+					stack.append(adj_vertex)
+
+		return visited_states
+
+	def __testequivalence__(self, vertex_a, vertex_b):
+		return (vertex_a in self.final_states and
+			vertex_b in self.final_states) or \
+			(vertex_a not in self.final_states and
+			vertex_b not in self.final_states)
+
 	def print(self):
 		print("Automaton transition matrix:")
 		for state in sorted(self.transit_matrix.keys()):
@@ -313,17 +335,108 @@ class Automaton:
 
 		return complementary
 
-	def load_regex(self, regex):
+	def concatenate(self, automaton):
 		pass
 
 	def union(self, automaton):
 		pass
 
+	def load_regex(self, regex):
+		pass
+
 	def intersection(self, automaton):
 		pass
 
-	def minimize(self):
-		pass
+	def minimize(self, dfa=False, sink_id="SINK"):
+		# Step 0: in order to minimize a automaton,
+		# we need to verify three characteristics:
+		# 0.1: Automaton must be a DFA
+		if not dfa:
+			minimal = self.nfae_to_nfa()
+			minimal = minimal.nfa_to_dfa()
+		else:
+			minimal = self.copy()
+		
+		# 0.2: Transition matrix must be full. So, try
+		# to generate a sink state to keep the transi-
+		# tion matrix full. This state, if created, will 
+		# be removed in the last minimization step.
+		minimal.__insertsinkstate__(sink_id)
+
+		# 0.3: Last subitem is to perform a blind search
+		# and remove all unreachable (for all symbols) sta-
+		# tes starting from the initial state
+		visited_nodes = minimal.__blindsearch__(minimal.initial_state)
+		nodes_to_remove = set(minimal.transit_matrix.keys()) - \
+			visited_nodes
+
+		for node in nodes_to_remove:
+			minimal.pop(node)
+
+		# Step 1: Fill the equivalence matrix
+		key_order = list(minimal.transit_matrix.keys())
+		transit_mat_len = len(key_order)
+		equivalence_mat = []
+
+		# 1.1: First, fill all trivially equivalent states
+		# A trivially equivalent states is such as both
+		# states are final or not final simultaneously.
+		equivalence_mat = [[[None] \
+			for _ in range(transit_mat_len)] \
+			for __ in range(transit_mat_len)]
+
+		for row in range(transit_mat_len - 1):
+			for col in range(row + 1, transit_mat_len):
+				equivalence_mat[row][col] = equivalence_mat[row][col]
+				if minimal.__testequivalence__(key_order[row], key_order[col]):
+					equivalence_mat[row][col] = []
+
+		# 1.2: Then, run a algorithm to find out non-trivial
+		# equivalent states
+		for row in range(transit_mat_len - 1):
+			for col in range(row + 1, transit_mat_len):
+				if equivalence_mat[row][col] is not None:
+					for symbol in minimal.alphabet:
+						target_row = key_order.index(minimal.transit_matrix[key_order[row]][symbol])
+						target_col = key_order.index(minimal.transit_matrix[key_order[col]][symbol])
+						if target_row != target_col:
+							if equivalence_mat[target_row][target_col] is None:
+								for row_k, row_l in equivalence_mat[row][col]:
+									equivalence_mat[row_k][row_l] = None
+								equivalence_mat[row][col] = None
+							else:
+								equivalence_mat[target_row][target_col].append({row, col})
+
+		# Step 2: Unify equivalent states. States may be 
+		# renamed freely if desired.
+
+		# FIX HERE!!!!!!!!!!!!!!!!!1
+		for row in range(transit_mat_len - 1):
+			for col in range(row + 1, transit_mat_len):
+				if equivalence_mat[row][col] is not None:
+					new_state_label = key_order[row] + key_order[col]
+
+					minimal.transit_matrix[new_state_label] = {}
+					for symbol in minimal.alphabet:
+						minimal.transit_matrix[new_state_label][symbol] = \
+							minimal.transit_matrix[key_order[row]][symbol] + \
+							minimal.transit_matrix[key_order[col]][symbol]
+				else:
+					key_order.pop(row)
+					key_order.pop(col)
+
+		for key in key_order:
+			minimal.transit_matrix.pop(key)
+
+		# Step 3: Delete states that can't lead to a final
+		# state. In this case, more blind search is needed.
+		# If no final state is reached, delete state and its
+		# transitions.
+		for state in minimal.transit_matrix:
+			visited_nodes = minimal.__blindsearch__(state)
+			
+			if not visited_nodes.intersection(minimal.final_states):
+				minimal.transit_matrix.pop(state)
 
 	def glud(self, dfa=False, initial_symbol="S", null_symbol="e"):
 		# First, the automaton must be an DFA
@@ -351,6 +464,9 @@ class Automaton:
 			glud_list[final_state].append(null_symbol)
 
 		return glud_list
+
+	def load_glud(self, filepath):
+		pass
 		
 if __name__ == "__main__":
 	import sys
@@ -371,9 +487,17 @@ if __name__ == "__main__":
 	d = ne.nfa_to_dfa()
 	d.print()
 
+	print("\n-- Minimal DFA automaton --")
+	d_min = d.minimize()
+	d_min.print()
+
 	print("\n-- Complementary automaton --")
 	c = d.complement()
 	c.print()
+
+	print("\n-- Minimal Complementary automaton --")
+	c_min = c.minimize()
+	c_min.print()
 
 	print("\n-- GLUD --")
 	glud = d.glud()
