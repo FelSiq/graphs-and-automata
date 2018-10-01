@@ -345,10 +345,13 @@ class Automaton:
 
 		return complementary
 
-	def concatenate(self, automaton, null_symbol="e"):
+	def __buildnewautomaton__(self, automaton, null_symbol="e"):
 		"""
-			The concatenation of two automatons:
+			This method unify two automatons structure,
+			needed for both operations of concatenation and
+			union and, by consequence, intersection.
 
+			Basics for all mentioned operation:
 			-	Expand the transition matrix, containing
 				all states to both alphabets
 
@@ -357,15 +360,9 @@ class Automaton:
 				respectivelly and A1 and A2 are the alphabet of
 				automatons 1 and 2, respectivelly).
 
-			- Build a null transition between all first automaton
-				final states and the initial state of the second
-				automaton.
+			-	The resultant alphabet has the two alphabets
+				plus the null transition symbol
 
-			- The initial state of the resultant automaton is the
-				initial state of the first automaton.
-
-			- The final states of the resultant automaton is the
-				final states of the second automaton.
 		"""
 		unified_transit_mat = copy.deepcopy(self.transit_matrix)
 
@@ -423,18 +420,38 @@ class Automaton:
 						unified_transit_mat[vertex][symbol] = \
 							{unified_transit_mat[vertex][symbol]}
 
-		# Now add null transitions between first automaton final
-		# states and second automaton initial state
-		for final_state in self.final_states:
-			unified_transit_mat[final_state][null_symbol] = \
-				{second_initial_state}
-
 		# Construct new alphabet. New alphabet must not have
 		# repeated symbols and must contain null transition symbol
 		unified_alphabet = copy.copy(self.alphabet)
 		for symbol in automaton.alphabet + [null_symbol]:
 			if symbol not in unified_alphabet:
 				unified_alphabet += [symbol]
+
+		return unified_transit_mat, unified_alphabet, \
+			second_initial_state, second_final_states
+
+	def concatenate(self, automaton, null_symbol="e"):
+		"""
+			The concatenation of two automatons:
+			- Build a null transition between all first automaton
+				final states and the initial state of the second
+				automaton.
+
+			- The initial state of the resultant automaton is the
+				initial state of the first automaton.
+
+			- The final states of the resultant automaton is the
+				final states of the second automaton.
+		"""
+		unified_transit_mat, unified_alphabet, \
+			second_initial_state, second_final_states = \
+				self.__buildnewautomaton__(automaton, null_symbol)
+
+		# Add null transitions between first automaton final
+		# states and second automaton initial state
+		for final_state in self.final_states:
+			unified_transit_mat[final_state][null_symbol] = \
+				{second_initial_state}
 
 		# Return concatenated automaton
 		return Automaton(
@@ -443,13 +460,13 @@ class Automaton:
 			final_states = second_final_states,
 			initial_state = self.initial_state)
 
-	def union(self, automaton):
+	def union(self, automaton, null_symbol="e"):
 		pass
 
 	def load_regex(self, regex):
 		pass
 
-	def intersection(self, automaton):
+	def intersection(self, automaton, null_symbol="e"):
 		pass
 
 	def minimize(self, dfa=False, sink_id="SINK"):
