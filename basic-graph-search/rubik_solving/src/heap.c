@@ -6,13 +6,15 @@
 
 struct heap_struct {
 	unsigned char ** restrict heap;
+	unsigned long int buffer_size;
 	unsigned long int size;
 };
 
 heap *heap_start() {
 	heap *h = malloc(sizeof(heap));
 	if (h != NULL) {
-		h->heap = NULL;
+		h->heap = malloc(sizeof(unsigned char *) * HEAP_INIT_BUFFER_SIZE);
+		h->buffer_size = HEAP_INIT_BUFFER_SIZE;
 		h->size = 0;
 	}
 	return h;
@@ -66,7 +68,15 @@ void heap_push(heap *h, unsigned char *restrict key_and_move) {
 	register const unsigned long int cur_size = h->size;
 	register unsigned long int cur_position = cur_size;
 
-	h->heap = realloc(h->heap, sizeof(unsigned char *) * (cur_size + 1));
+	#if ENABLE_IDA_STAR == 0
+		// If ENABLE_IDA_STAR is enabled, then the initial
+		// HEAP BUFFER must be fixed.
+		if (cur_size + 1 >= h->buffer_size) {
+			h->buffer_size *= 2;
+			h->heap = realloc(h->heap, sizeof(unsigned char *) * h->buffer_size);
+		}
+	#endif
+
 	h->heap[cur_size] = key_and_move;
 
 	unsigned char *aux;

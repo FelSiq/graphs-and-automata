@@ -2,11 +2,10 @@
 #include <stdio.h>
 #include <rubik.h>
 #include <string.h>
+#include <heap.h>
 
 #if ENABLE_IDA_STAR
 	#include <stack.h>
-#else
-	#include <heap.h>
 #endif
 
 struct rubik_struct {
@@ -18,12 +17,8 @@ struct rubik_struct {
 };
 
 enum {
-	#if ENABLE_IDA_STAR
-		PACK_GCOST,
-	#else
-		PACK_HEAPKEY,
-		PACK_GCOST=sizeof(float),
-	#endif
+	PACK_HEAPKEY,
+	PACK_GCOST=sizeof(float),
 	PACK_MOVES,
 	PACK_SIZE
 };
@@ -223,6 +218,9 @@ int rubik_solve(rubik *restrict r) {
 			color, 
 			dir;
 
+		float *aux_h_pointer;
+		heap *minheap = heap_start();
+
 		#if ENABLE_IDA_STAR
 			stack *movestack = stack_start();
 			stack_push(movestack, new_item);
@@ -230,8 +228,7 @@ int rubik_solve(rubik *restrict r) {
 				next_threshold = threshold;
 			float f_cost_total;
 		#else
-			heap *minheap = heap_start();
-			float *aux_h_pointer = (float *) new_item;
+			aux_h_pointer = (float *) new_item;
 			aux_h_pointer[PACK_HEAPKEY] = 0.0;
 			heap_push(minheap, new_item);
 		#endif
@@ -257,7 +254,7 @@ int rubik_solve(rubik *restrict r) {
 					// Next IDDFS algorithm: init a empty
 					// move and update threshold
 					cur_item = __empty_move__();
-					threshold = next_threshold;
+					threshold = next_threshold + IDA_DEGREES_OF_FREEDOM;
 					next_threshold = INFINITY;
 				}
 			#else
@@ -282,16 +279,18 @@ int rubik_solve(rubik *restrict r) {
 					new_item[PACK_GCOST] = cur_item[PACK_GCOST] + 1;
 					memcpy(new_item + PACK_MOVES, cur_item + PACK_MOVES, cur_item[PACK_GCOST]);
 					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_SEQ[dir];
+					aux_h_pointer = (float *) new_item;
+					aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
 					
 					#if ENABLE_IDA_STAR
-						stack_push(movestack, new_item);
+						// Turn minheap into maxheap reversing the key signal
+						aux_h_pointer[PACK_HEAPKEY] *= -1.0;
+						heap_push(minheap, new_item);
 
 						} else {
 							next_threshold = MIN(next_threshold, f_cost_total);
 						}
 					#else
-						aux_h_pointer = (float *) new_item;
-						aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
 						heap_push(minheap, new_item);
 					#endif
 
@@ -299,6 +298,14 @@ int rubik_solve(rubik *restrict r) {
 					__mat_rot__(r, color, DIR_SEQ[dir + 1], 1);
 				} // End of DIR loop
 			} // End of COLOR loop
+
+			#if ENABLE_IDA_STAR
+				// Heapsort on movement stack
+				color = heap_size(minheap);
+				while (color--) {
+					stack_push(movestack, heap_pop(minheap));
+				}
+			#endif
 
 			free(cur_item);
 		}
@@ -309,6 +316,7 @@ int rubik_solve(rubik *restrict r) {
 			cur_item = heap_pop(minheap);
 		#endif
 
+		__recover_state__(r, cur_item);
 		r->sol_size = cur_item[PACK_GCOST];
 		r->solution = malloc(sizeof(unsigned char) * r->sol_size);
 		memcpy(r->solution, cur_item + PACK_MOVES, r->sol_size);
@@ -326,9 +334,9 @@ int rubik_solve(rubik *restrict r) {
 
 		#if ENABLE_IDA_STAR
 			stack_destroy(&movestack);
-		#else
-			heap_destroy(&minheap);
 		#endif
+
+		heap_destroy(&minheap);
 
 		return 1;
 	}

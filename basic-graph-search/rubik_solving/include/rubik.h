@@ -6,6 +6,7 @@
 // Enables use of IDA*. If false, use A*, which
 // consumes way too much memory.
 #define ENABLE_IDA_STAR 1
+#define IDA_DEGREES_OF_FREEDOM 2
 
 #ifndef MIN
 	#define MIN(A, B) (((A) < (B)) ? (A) : (B))
