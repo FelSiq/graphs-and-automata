@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import copy
 import re
 
@@ -13,10 +14,15 @@ class Automaton:
 		# "transit_matrix" is already a formal representation
 		# of both the set of automaton possible states and
 		# the transition function.
-		self.transit_matrix = copy.deepcopy(transit_matrix) if transit_matrix else {}
+		self.transit_matrix = copy.deepcopy(transit_matrix) \
+			if transit_matrix else OrderedDict()
+
 		self.alphabet = copy.deepcopy(alphabet) if alphabet else []
+
 		self.initial_state = initial_state
-		self.final_states = copy.deepcopy(final_states) if final_states else set()
+
+		self.final_states = copy.deepcopy(final_states) \
+			if final_states else set()
 
 		if filepath is not None:
 			if regex is not None:
@@ -143,7 +149,7 @@ class Automaton:
 			else:
 				state_label = " " + state_label + " "
 
-			print(state_label, end="\t:|")
+			print(state_label, end=" : |")
 			
 			entries = self.transit_matrix[state]
 
@@ -153,9 +159,9 @@ class Automaton:
 			print()
 
 		print("\nAutomaton properties:",
-			"\nalphabet:", self.alphabet,
-			"\nstart state:", self.initial_state,
-			"\nfinal states:", self.final_states)
+			"\n\talphabet:", self.alphabet,
+			"\n\tstart state:", self.initial_state,
+			"\n\tfinal states:", self.final_states)
 
 	def gen_input_file(self):
 		print(",".join(self.alphabet))
@@ -263,7 +269,14 @@ class Automaton:
 
 		return nfa
 
-	def complement(self, sink_id="SINK"):
+	def copy(self):
+		return Automaton(
+			alphabet=self.alphabet,
+			transit_matrix=self.transit_matrix,
+			initial_state=self.initial_state,
+			final_states=self.final_states)
+
+	def complement(self, dfa=False, sink_id="SINK"):
 		"""
 			A complementary Automaton has all
 			non-final states transformed into
@@ -277,8 +290,11 @@ class Automaton:
 		"""
 
 		# First, the automaton must be an DFA
-		dfa_automaton = self.nfae_to_nfa()
-		dfa_automaton = dfa_automaton.nfa_to_dfa()
+		if not dfa:
+			dfa_automaton = self.nfae_to_nfa()
+			dfa_automaton = dfa_automaton.nfa_to_dfa()
+		else:
+			dfa_automaton = self.copy()
 
 		# Try to insert a sink state in order to keep
 		# the complementary automaton transition matrix
@@ -309,8 +325,32 @@ class Automaton:
 	def minimize(self):
 		pass
 
-	def gen_regular_gramatic(self):
-		pass
+	def glud(self, dfa=False, initial_symbol="S", null_symbol="e"):
+		# First, the automaton must be an DFA
+		if not dfa:
+			dfa_automaton = self.nfae_to_nfa()
+			dfa_automaton = dfa_automaton.nfa_to_dfa()
+		else:
+			dfa_automaton = self.copy()
+
+		glud_list = OrderedDict()
+		glud_list[initial_symbol] = ["(" + self.initial_state + ")"]
+
+		for state in self.transit_matrix:
+			glud_list[state] = []
+
+			for symbol in self.alphabet:
+				if self.transit_matrix[state][symbol]:
+					glud_list[state].append(symbol + \
+						"(" + self.transit_matrix[state][symbol] + ")")
+
+			if not glud_list[state]:
+				glud_list.pop(state)
+
+		for final_state in self.final_states:
+			glud_list[final_state].append(null_symbol)
+
+		return glud_list
 		
 if __name__ == "__main__":
 	import sys
@@ -334,3 +374,10 @@ if __name__ == "__main__":
 	print("\n-- Complementary automaton --")
 	c = d.complement()
 	c.print()
+
+	print("\n-- GLUD --")
+	glud = d.glud()
+	for variable in glud:
+		for rules in glud[variable]:
+			print(variable, "->", rules)
+	
