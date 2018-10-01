@@ -510,10 +510,18 @@ class Automaton:
 
 						if target_row != target_col:
 							if equivalence_mat[target_row][target_col][0] is None:
-								for row_k, col_l in equivalence_mat[row][col][0]:
-									equivalence_mat[row_k][col_l][0] = None
+								# Recursive process of marking all "not equivalent" 
+								# memoized pairs
+								stack = [{row, col}]
+								
+								while stack:
+									row_k, col_l = stack.pop()
 
-								equivalence_mat[row][col][0] = None
+									if equivalence_mat[row_k][col_l][0] is not None:
+										for memoized_pairs in equivalence_mat[row_k][col_l][0]:
+											stack.append(memoized_pairs)
+
+									equivalence_mat[row_k][col_l][0] = None
 							else:
 								equivalence_mat[target_row][target_col][0].append({row, col})
 
