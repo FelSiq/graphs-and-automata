@@ -404,6 +404,10 @@ class Automaton:
 				second_final_states.remove(state)
 				second_final_states.update({state + "B"})
 
+		second_initial_state = copy.copy(automaton.initial_state)
+		second_initial_state += "B" if second_initial_state \
+			in self.transit_matrix else ""
+
 		# Unify both transit matrix and add undefined transitions to
 		# the second automaton states for symbols in current automaton
 		# alphabet which are not present in the second automaton alpha-
@@ -421,10 +425,9 @@ class Automaton:
 
 		# Now add null transitions between first automaton final
 		# states and second automaton initial state
-
 		for final_state in self.final_states:
 			unified_transit_mat[final_state][null_symbol] = \
-				{automaton.initial_state}
+				{second_initial_state}
 
 		# Construct new alphabet. New alphabet must not have
 		# repeated symbols and must contain null transition symbol
