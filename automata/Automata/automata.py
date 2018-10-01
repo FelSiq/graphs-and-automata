@@ -158,9 +158,14 @@ class Automaton:
 			(vertex_a not in self.final_states and
 			vertex_b not in self.final_states)
 
-	def print(self):
+	def print(self, undefined_symbol="-", sort_state_names=False):
 		print("Automaton transition matrix:")
-		for state in sorted(self.transit_matrix.keys()):
+
+		max_id_len = 4 + max([len(state) \
+			for state in self.transit_matrix.keys()])
+
+		for state in sorted(self.transit_matrix.keys()) \
+			if sort_state_names else self.transit_matrix.keys():
 			
 			state_label = state
 	
@@ -174,12 +179,14 @@ class Automaton:
 			else:
 				state_label = " " + state_label + " "
 
-			print(state_label, end=" : |")
+			print("{vid:<{fill}}".format(vid=state_label, fill=max_id_len), end=" : |")
 			
 			entries = self.transit_matrix[state]
 
 			for c in self.alphabet:
-				print(entries[c], end="|")
+				print("{vid:<{fill}}".format(\
+					vid=str(entries[c]), fill=max_id_len) if entries[c] \
+						else max_id_len * undefined_symbol, end="|")
 
 			print()
 
@@ -338,8 +345,100 @@ class Automaton:
 
 		return complementary
 
-	def concatenate(self, automaton):
-		pass
+	def concatenate(self, automaton, null_symbol="e"):
+		"""
+			The concatenation of two automatons:
+
+			-	Expand the transition matrix, containing
+				all states to both alphabets
+
+				(transit_func : (Q1 U Q2) X (A1 U A2) -> (Q1 U Q2),
+				where Q1 and Q2 are the states of automaton 1 and 2
+				respectivelly and A1 and A2 are the alphabet of
+				automatons 1 and 2, respectivelly).
+
+			- Build a null transition between all first automaton
+				final states and the initial state of the second
+				automaton.
+
+			- The initial state of the resultant automaton is the
+				initial state of the first automaton.
+
+			- The final states of the resultant automaton is the
+				final states of the second automaton.
+		"""
+		unified_transit_mat = copy.deepcopy(self.transit_matrix)
+
+		# Add undefined transitions for all states of the current
+		# automaton to the symbols of the second automaton alphabet
+		# which are not in the current automaton alphabet
+		for vertex in self.transit_matrix:
+			for symbol in automaton.alphabet + [null_symbol]:
+				if symbol not in unified_transit_mat[vertex]:
+					unified_transit_mat[vertex][symbol] = set()
+				else:
+					if type(unified_transit_mat[vertex][symbol]) != type(set()):
+						unified_transit_mat[vertex][symbol] = \
+							{unified_transit_mat[vertex][symbol]}
+
+		# Verify if second automaton states has conflicting names/id
+		# in relation of the first automaton
+		second_transit_mat = copy.deepcopy(automaton.transit_matrix)
+		rename_struct = {}
+		for vertex in automaton.transit_matrix:
+			if vertex in unified_transit_mat:
+				new_vertex_label = vertex + "B"
+				rename_struct[vertex] = new_vertex_label
+				second_transit_mat[new_vertex_label] = second_transit_mat.pop(vertex)
+
+		for vertex in second_transit_mat:
+			for symbol in automaton.alphabet:
+				target_vertex = second_transit_mat[vertex][symbol]
+				if target_vertex and target_vertex in rename_struct:
+					second_transit_mat[vertex][symbol] = rename_struct[target_vertex]
+
+		# Don't forget the final state list
+		second_final_states = copy.deepcopy(automaton.final_states)
+		for state in second_final_states:
+			if state in self.final_states:
+				second_final_states.remove(state)
+				second_final_states.update({state + "B"})
+
+		# Unify both transit matrix and add undefined transitions to
+		# the second automaton states for symbols in current automaton
+		# alphabet which are not present in the second automaton alpha-
+		# bet.
+		for vertex in second_transit_mat:
+			unified_transit_mat[vertex] = second_transit_mat[vertex]
+
+			for symbol in self.alphabet + [null_symbol]:
+				if symbol not in unified_transit_mat[vertex]:
+					unified_transit_mat[vertex][symbol] = set()
+				else:
+					if type(unified_transit_mat[vertex][symbol]) != type(set()):
+						unified_transit_mat[vertex][symbol] = \
+							{unified_transit_mat[vertex][symbol]}
+
+		# Now add null transitions between first automaton final
+		# states and second automaton initial state
+
+		for final_state in self.final_states:
+			unified_transit_mat[final_state][null_symbol] = \
+				{automaton.initial_state}
+
+		# Construct new alphabet. New alphabet must not have
+		# repeated symbols and must contain null transition symbol
+		unified_alphabet = copy.copy(self.alphabet)
+		for symbol in automaton.alphabet + [null_symbol]:
+			if symbol not in unified_alphabet:
+				unified_alphabet += [symbol]
+
+		# Return concatenated automaton
+		return Automaton(
+			transit_matrix = unified_transit_mat,
+			alphabet = unified_alphabet,
+			final_states = second_final_states,
+			initial_state = self.initial_state)
 
 	def union(self, automaton):
 		pass
@@ -440,7 +539,7 @@ class Automaton:
 		for vertex in minimal.transit_matrix:
 			for symbol in minimal.alphabet:
 				cur_transit_vertex = minimal.transit_matrix[vertex][symbol]
-				if cur_transit_vertex in rename_struct:
+				if cur_transit_vertex and cur_transit_vertex in rename_struct:
 					minimal.transit_matrix[vertex][symbol] = rename_struct[cur_transit_vertex]
 
 		# Step 3: Delete states that can't lead to a final
@@ -537,4 +636,8 @@ if __name__ == "__main__":
 	for variable in glud:
 		for rules in glud[variable]:
 			print(variable, "->", rules)
+
+	print("\n-- CONCATENATION --")
+	concat = d.concatenate(d)
+	concat.print()
 	
