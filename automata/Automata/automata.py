@@ -9,7 +9,8 @@ class Automaton:
 		transit_matrix=None,
 		initial_state=None, 
 		final_states=None,
-		regex=None):
+		regex=None,
+		sep=","):
 
 		# "transit_matrix" is already a formal representation
 		# of both the set of automaton possible states and
@@ -28,11 +29,12 @@ class Automaton:
 			if regex is not None:
 				print("Warning: ignoring \"regex\" parameter",
 					"(\"filepath\" is specified)")
-			self.__readautomaton__(filepath)
-		else:
+			self.__readautomaton__(filepath=filepath, sep=sep)
+
+		elif regex is not None:
 			self.load_regex(regex)
 
-	def __readautomaton__(self, filepath):
+	def __readautomaton__(self, filepath, sep=","):
 		# Regex used to get each state set of 
 		# the transition matrix in the input file
 		re_get_set = re.compile(r"{([^}]*)}")
@@ -40,7 +42,8 @@ class Automaton:
 		# Regex used to get the state identifier of
 		# each entry of the transition matrix also
 		# from the input file
-		re_get_state = re.compile(r"^\s*([^\s,]+)\s*,")
+		re_get_state = re.compile(r"^\s*([^\s(" + sep + \
+			")]+)\s*" + sep)
 
 		# This matrix determines if each state is a final
 		# state. The identifier adopted in this application
@@ -50,7 +53,7 @@ class Automaton:
 		re_sbrackets = re.compile(r"\[|\]")
 
 		with open(filepath) as f:
-			self.alphabet = f.readline().strip().split(",")
+			self.alphabet = f.readline().strip().split(sep)
 			self.initial_state = f.readline().strip()
 
 			for line in f:
@@ -64,7 +67,7 @@ class Automaton:
 
 				entries = {}
 				for symbol, set_str in zip(self.alphabet, re_get_set.findall(line)):
-					entries[symbol] = set(set_str.split(","))
+					entries[symbol] = set(set_str.split(sep))
 					if "" in entries[symbol]:
 						entries[symbol].remove("")
 
@@ -387,56 +390,82 @@ class Automaton:
 
 		for row in range(transit_mat_len - 1):
 			for col in range(row + 1, transit_mat_len):
-				equivalence_mat[row][col] = equivalence_mat[row][col]
+				equivalence_mat[row][col] = equivalence_mat[col][row]
 				if minimal.__testequivalence__(key_order[row], key_order[col]):
-					equivalence_mat[row][col] = []
+					equivalence_mat[row][col][0] = []
 
 		# 1.2: Then, run a algorithm to find out non-trivial
 		# equivalent states
 		for row in range(transit_mat_len - 1):
 			for col in range(row + 1, transit_mat_len):
-				if equivalence_mat[row][col] is not None:
+				if equivalence_mat[row][col][0] is not None:
 					for symbol in minimal.alphabet:
-						target_row = key_order.index(minimal.transit_matrix[key_order[row]][symbol])
-						target_col = key_order.index(minimal.transit_matrix[key_order[col]][symbol])
+						target_row = key_order.index(\
+							minimal.transit_matrix[key_order[row]][symbol])
+
+						target_col = key_order.index(\
+							minimal.transit_matrix[key_order[col]][symbol])
+
 						if target_row != target_col:
-							if equivalence_mat[target_row][target_col] is None:
-								for row_k, row_l in equivalence_mat[row][col]:
-									equivalence_mat[row_k][row_l] = None
-								equivalence_mat[row][col] = None
+							if equivalence_mat[target_row][target_col][0] is None:
+								for row_k, col_l in equivalence_mat[row][col][0]:
+									equivalence_mat[row_k][col_l][0] = None
+
+								equivalence_mat[row][col][0] = None
 							else:
-								equivalence_mat[target_row][target_col].append({row, col})
+								equivalence_mat[target_row][target_col][0].append({row, col})
 
 		# Step 2: Unify equivalent states. States may be 
 		# renamed freely if desired.
 
-		# FIX HERE!!!!!!!!!!!!!!!!!1
+		rename_struct = {}
 		for row in range(transit_mat_len - 1):
 			for col in range(row + 1, transit_mat_len):
-				if equivalence_mat[row][col] is not None:
+				if equivalence_mat[row][col][0] is not None:
+					# States are equivalent, aglomerate then into a single one
 					new_state_label = key_order[row] + key_order[col]
+					rename_struct[key_order[row]] = new_state_label
+					rename_struct[key_order[col]] = new_state_label
 
 					minimal.transit_matrix[new_state_label] = {}
 					for symbol in minimal.alphabet:
 						minimal.transit_matrix[new_state_label][symbol] = \
-							minimal.transit_matrix[key_order[row]][symbol] + \
-							minimal.transit_matrix[key_order[col]][symbol]
-				else:
-					key_order.pop(row)
-					key_order.pop(col)
+							minimal.transit_matrix[key_order[row]][symbol]
 
-		for key in key_order:
-			minimal.transit_matrix.pop(key)
+		# Remove equivalent states from transit_matrix
+		for vertex in rename_struct:
+			minimal.transit_matrix.pop(vertex)
+
+		# Rename all removed states to the new aglomerated label
+		for vertex in minimal.transit_matrix:
+			for symbol in minimal.alphabet:
+				cur_transit_vertex = minimal.transit_matrix[vertex][symbol]
+				if cur_transit_vertex in rename_struct:
+					minimal.transit_matrix[vertex][symbol] = rename_struct[cur_transit_vertex]
 
 		# Step 3: Delete states that can't lead to a final
 		# state. In this case, more blind search is needed.
 		# If no final state is reached, delete state and its
 		# transitions.
+		non_useful_states = []
 		for state in minimal.transit_matrix:
 			visited_nodes = minimal.__blindsearch__(state)
 			
 			if not visited_nodes.intersection(minimal.final_states):
-				minimal.transit_matrix.pop(state)
+				non_useful_states.append(state)
+
+		for state in non_useful_states:
+			# Remove all transitions associated with that useless state
+			for vertex in minimal.transit_matrix:
+				for symbol in minimal.alphabet:
+					if minimal.transit_matrix[vertex][symbol] == state:
+						minimal.transit_matrix[vertex][symbol] = set()
+
+			# Pop state from minimal automaton transition matrix
+			minimal.transit_matrix.pop(state)
+
+		# End of minimization, return minimal automaton
+		return minimal
 
 	def glud(self, dfa=False, initial_symbol="S", null_symbol="e"):
 		# First, the automaton must be an DFA
@@ -461,6 +490,10 @@ class Automaton:
 				glud_list.pop(state)
 
 		for final_state in self.final_states:
+
+			if final_state not in glud_list:
+				glud_list[final_state] = []
+
 			glud_list[final_state].append(null_symbol)
 
 		return glud_list
