@@ -143,7 +143,7 @@ class Automaton:
 		while stack:
 			cur_state = stack.pop()
 
-			for symbol in self.transit_matrix[cur_state]:
+			for symbol in self.alphabet:
 				adj_vertex = self.transit_matrix[cur_state][symbol]
 
 				if adj_vertex and adj_vertex not in visited_states:
@@ -460,8 +460,62 @@ class Automaton:
 			final_states = second_final_states,
 			initial_state = self.initial_state)
 
-	def union(self, automaton, null_symbol="e"):
-		pass
+	def __stateidsintegrity__(self, state_list, \
+		initial_state_id, final_state_id):
+		
+		while initial_state_id in state_list:
+			initial_state_id += "@"
+
+		while final_state_id in state_list:
+			final_state_id += "@"
+
+		return initial_state_id, final_state_id
+
+	def union(self, automaton, initial_state_id="US", 
+		final_state_id="UF", null_symbol="e"):
+
+		"""
+			The union of two automatons is pretty much
+			similar to the concatenation.
+
+			- Build a null transition connecting a new dummy
+				initial state to both initial states
+
+			- Build a null transition connecting a new dummy
+				final state to all final states of both
+				automatons
+
+			- All initial and final states of both automatons
+				are downgraded to common states.
+		"""
+
+		unified_transit_mat, unified_alphabet, \
+			second_initial_state, second_final_states = \
+				self.__buildnewautomaton__(automaton, null_symbol)
+
+		initial_state_id, final_state_id = self.__stateidsintegrity__(\
+			unified_transit_mat.keys(), initial_state_id, final_state_id)
+
+		# Create a new dummy initial state and connect
+		# it to both initial states of both automatons
+		unified_transit_mat[initial_state_id] = {}
+		for symbol in unified_alphabet:
+			unified_transit_mat[initial_state_id][symbol] = set()
+		unified_transit_mat[initial_state_id][null_symbol] = \
+			{self.initial_state, second_initial_state}
+
+		# Create a new dummy final state, and connect all previous final
+		# states (of both automatons) to this new state via null transition
+		for vertex in self.final_states.union(second_final_states):
+			unified_transit_mat[vertex][null_symbol].update({final_state_id})
+		unified_transit_mat[final_state_id] = {symbol : set() \
+			for symbol in unified_alphabet} 
+
+		return Automaton(
+			alphabet=unified_alphabet,
+			initial_state=initial_state_id,
+			final_states={final_state_id},
+			transit_matrix=unified_transit_mat)
 
 	def load_regex(self, regex):
 		pass
@@ -570,6 +624,15 @@ class Automaton:
 				if cur_transit_vertex and cur_transit_vertex in rename_struct:
 					minimal.transit_matrix[vertex][symbol] = rename_struct[cur_transit_vertex]
 
+		# Don't forget to check the final state list and the initial state
+		if minimal.initial_state in rename_struct:
+			minimal.initial_state = rename_struct[minimal.initial_state]
+
+		for final_state in copy.copy(minimal.final_states):
+			if final_state in rename_struct:
+				minimal.final_states.remove(final_state)
+				minimal.final_states.update({rename_struct[final_state]})
+
 		# Step 3: Delete states that can't lead to a final
 		# state. In this case, more blind search is needed.
 		# If no final state is reached, delete state and its
@@ -577,9 +640,12 @@ class Automaton:
 		non_useful_states = []
 		for state in minimal.transit_matrix:
 			visited_nodes = minimal.__blindsearch__(state)
-			
 			if not visited_nodes.intersection(minimal.final_states):
 				non_useful_states.append(state)
+		print("--")
+		print(minimal.final_states)
+		print(non_useful_states)
+		print(minimal.transit_matrix)
 
 		for state in non_useful_states:
 			# Remove all transitions associated with that useless state
@@ -667,5 +733,9 @@ if __name__ == "__main__":
 
 	print("\n-- CONCATENATION --")
 	concat = d.concatenate(d)
+	concat.print()
+
+	print("\n-- Union --")
+	concat = d.union(d)
 	concat.print()
 	
