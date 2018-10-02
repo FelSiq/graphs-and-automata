@@ -16,14 +16,15 @@ class Automaton:
 		# of both the set of automaton possible states and
 		# the transition function.
 		self.transit_matrix = copy.deepcopy(transit_matrix) \
-			if transit_matrix else OrderedDict()
+			if transit_matrix is not None and transit_matrix else OrderedDict()
 
-		self.alphabet = copy.deepcopy(alphabet) if alphabet else []
+		self.alphabet = copy.deepcopy(alphabet) \
+			if alphabet is not None and alphabet else []
 
 		self.initial_state = initial_state
 
 		self.final_states = copy.deepcopy(final_states) \
-			if final_states else set()
+			if final_states is not None and final_states else set()
 
 		if filepath is not None:
 			if regex is not None:
@@ -299,6 +300,10 @@ class Automaton:
 
 					nfa.transit_matrix[state][symbol] = nfa_state_transit
 
+		for vertex in nfa.transit_matrix:
+			if null_symbol in nfa.transit_matrix[vertex]:
+				nfa.transit_matrix[vertex].remove(null_symbol)
+
 		return nfa
 
 	def copy(self):
@@ -390,9 +395,14 @@ class Automaton:
 
 		for vertex in second_transit_mat:
 			for symbol in automaton.alphabet:
-				target_vertex = second_transit_mat[vertex][symbol]
-				if target_vertex and target_vertex in rename_struct:
-					second_transit_mat[vertex][symbol] = rename_struct[target_vertex]
+				if type(second_transit_mat[vertex][symbol]) != type(set()):
+					second_transit_mat[vertex][symbol] = \
+						{second_transit_mat[vertex][symbol]}
+
+				for target_vertex in second_transit_mat[vertex][symbol]:
+					if target_vertex and target_vertex in rename_struct:
+						second_transit_mat[vertex][symbol] = \
+							rename_struct[target_vertex]
 
 		# Don't forget the final state list
 		second_final_states = copy.deepcopy(automaton.final_states)
@@ -401,6 +411,7 @@ class Automaton:
 				second_final_states.remove(state)
 				second_final_states.update({state + "B"})
 
+		# Neither the initial state
 		second_initial_state = copy.copy(automaton.initial_state)
 		second_initial_state += "B" if second_initial_state \
 			in self.transit_matrix else ""
@@ -520,8 +531,47 @@ class Automaton:
 	def load_regex(self, regex):
 		pass
 
-	def intersection(self, automaton, null_symbol="e"):
-		pass
+	def intersection(self, 
+		automaton, 
+		sink_id="SINK", 
+		null_symbol="e", 
+		initial_state_id="US", 
+		final_state_id="UF"):
+
+		"""
+			A intersection of automatons uses the
+			DeMorgan's Law:
+
+			intersection(A, B) := !(union(!A, !B))
+
+			Which means that
+			
+			intersection(Automaton_A, Automaton_B) :=
+				complement(
+					union(
+						complement(Automaton_A), 
+						complement(Automaton_B)
+					)
+				)
+
+			So be it.
+		"""
+		c_aut_a = self.complement(
+			dfa=False, 
+			sink_id=sink_id)
+
+		c_aut_b = automaton.complement(
+			dfa=False, 
+			sink_id=sink_id)
+
+		union_result = c_aut_a.union(c_aut_b, 
+			initial_state_id=initial_state_id, 
+			final_state_id=final_state_id,
+			null_symbol=null_symbol)
+
+		return union_result.complement(
+			dfa=False, 
+			sink_id=sink_id)
 
 	def minimize(self, dfa=False, sink_id="SINK"):
 		# Step 0: in order to minimize a automaton,
@@ -642,10 +692,6 @@ class Automaton:
 			visited_nodes = minimal.__blindsearch__(state)
 			if not visited_nodes.intersection(minimal.final_states):
 				non_useful_states.append(state)
-		print("--")
-		print(minimal.final_states)
-		print(non_useful_states)
-		print(minimal.transit_matrix)
 
 		for state in non_useful_states:
 			# Remove all transitions associated with that useless state
@@ -731,11 +777,12 @@ if __name__ == "__main__":
 		for rules in glud[variable]:
 			print(variable, "->", rules)
 
-	print("\n-- CONCATENATION --")
-	concat = d.concatenate(d)
-	concat.print()
-
 	print("\n-- Union --")
-	concat = d.union(d)
-	concat.print()
+	uni = d.union(d)
+	uni.print()
+	
+	print("\n-- Intersection --")
+	d.print()
+	inter = d.intersection(d)
+	inter.print()
 	
