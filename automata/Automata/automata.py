@@ -225,6 +225,10 @@ class Automaton:
 		# Initial configuration of the resultant automaton
 		initial_state_name = state_prefix + "0"
 		dfa_var.initial_state = initial_state_name
+
+		if self.initial_state in self.final_states:
+			dfa_var.final_states.update({initial_state_name})
+
 		list_to_proc = [initial_state_name]
 		mapping = {initial_state_name : {self.initial_state}}
 
@@ -243,6 +247,7 @@ class Automaton:
 						new_state_name = state_prefix + str(len(mapping))
 						mapping[new_state_name] = aux
 						list_to_proc.append(new_state_name)
+
 						transit_name = new_state_name
 						if self.final_states.intersection(aux):
 							dfa_var.final_states.update({transit_name})
@@ -430,7 +435,6 @@ class Automaton:
 					if type(unified_transit_mat[vertex][symbol]) != type(set()):
 						unified_transit_mat[vertex][symbol] = \
 							{unified_transit_mat[vertex][symbol]}
-
 		# Construct new alphabet. New alphabet must not have
 		# repeated symbols and must contain null transition symbol
 		unified_alphabet = copy.copy(self.alphabet)
@@ -597,12 +601,11 @@ class Automaton:
 			visited_nodes
 
 		for node in nodes_to_remove:
-			minimal.pop(node)
+			minimal.transit_matrix.remove(node)
 
 		# Step 1: Fill the equivalence matrix
 		key_order = list(minimal.transit_matrix.keys())
 		transit_mat_len = len(key_order)
-		equivalence_mat = []
 
 		# 1.1: First, fill all trivially equivalent states
 		# A trivially equivalent states is such as both
@@ -613,7 +616,7 @@ class Automaton:
 
 		for row in range(transit_mat_len - 1):
 			for col in range(row + 1, transit_mat_len):
-				equivalence_mat[row][col] = equivalence_mat[col][row]
+				equivalence_mat[col][row] = equivalence_mat[row][col]
 				if minimal.__testequivalence__(key_order[row], key_order[col]):
 					equivalence_mat[row][col][0] = []
 
@@ -643,6 +646,9 @@ class Automaton:
 											stack.append(memoized_pairs)
 
 									equivalence_mat[row_k][col_l][0] = None
+
+								# No need to verify the remaining symbols of the alphabet
+								break
 							else:
 								equivalence_mat[target_row][target_col][0].append({row, col})
 
@@ -782,7 +788,5 @@ if __name__ == "__main__":
 	uni.print()
 	
 	print("\n-- Intersection --")
-	d.print()
 	inter = d.intersection(d)
 	inter.print()
-	
