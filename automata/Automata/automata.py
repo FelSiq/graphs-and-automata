@@ -10,7 +10,96 @@ class Automaton:
 		initial_state=None, 
 		final_states=None,
 		regex=None,
-		sep=","):
+		grammar=None,
+		sep=",",
+		null_symbol="e"):
+
+		"""
+			Attributes description:
+
+			filepath	: Source file where the automaton properties
+					are specified. The input file must follow the
+					model right below:
+					
+					<alphabet with m symbols separated by "sep>
+					<initial state>
+					<state_0>, {delta(<state_0>, symbol_0)}, ..., {delta(<state_0>, symbol_m)}
+					<state_1>, {delta(<state_1>, symbol_0)}, ..., {delta(<state_1>, symbol_m)}
+					...
+					<state_n>, {delta(<state_n>, symbol_0)}, ..., {delta(<state_n>, symbol_m)}
+					
+					Final states must be marked with square brackets ("[]") around their
+					identifier in the transition matrix identifier declaration.
+
+					Example:
+					
+					a,b
+					q0
+					q0,{q1},{q0}
+					[q1],{q2,q1,q0},{q1,q2}
+					q2,{},{q0}
+
+					In the exemple above, the alphabet is {a,b} and the automaton has
+					three states, {q0, q1, q2} and a single final state {q1} (marked with
+					square brackets around it's identifier).
+
+			The parameters below only make sense if no filepath is given.
+			alphabet	: The alphabet of the new automaton. Must be a <list> type.
+
+			transit_matrix	: The transition matrix of automaton. Must be a <dictionary> type structure,
+					with each key being a state and each value is another <dictionary> containing
+					all alphabet as keys and it's values must be <set> containing all states rea-
+					ched by the current state and the current symbol. The transition matrix
+					of the previous example would be:
+
+					transit_matrix = {
+						"q0" : {"a" : {q1} ,"b" : {q0}}
+						"q1" : {"a" : {q1, q2, q0} ,"b" : {q1, q2}}
+						"q2" : {"a" : {} ,"b" : {q0}}
+					}
+
+			initial_state	: A <string> containing the identifier of the automaton initial state.
+
+			final_states	: A <set> type structure containing all automaton final state idenfiers.
+
+			regex		: A string containing a basic "regex"-like pattern in order to be converted
+					to a automaton. The operations supported are defined below:
+					
+					Let "a" and "b" be linear expressions (a set of symbols in a given alphabet).
+
+					1. Concatenation: ab
+					2. Union: a + b
+					3. (Kleene Star) Sucessive concatenation: a*
+					4. (Kleene Sum): a+
+
+			grammar		: A filepath containing a set of rules in URLG ("Unitary Right Linear Grammar")
+					form. The model of the input file must follow the pattern given below:
+
+					<terminal symbols list separated by "sep">
+					<initial variable identifier>
+					<s_a> -> symbol_x(<s_i>)
+					<s_b> -> symbol_y(<s_j>)
+					<s_c> -> symbol_z(<s_k>)
+					...
+					<s_z> -> symbol_w(<s_w>)
+
+					Where all variables to the right must be around parenthesis "()".
+
+					Example:
+					a,b,c
+					S
+					S -> a(A)
+					A -> b(A)
+					A -> a(B)
+					B -> c
+					B -> e
+
+					Where the variables are {S, A, B} and the terminal symbols {a, b, c}.
+					"e" is the null transition/empty string symbol.
+
+			null_symbol	: Symbol used as null_transition/empty string. Must be
+					given when both loading a regex or a grammar.
+		"""
 
 		# "transit_matrix" is already a formal representation
 		# of both the set of automaton possible states and
@@ -27,13 +116,13 @@ class Automaton:
 			if final_states is not None and final_states else set()
 
 		if filepath is not None:
-			if regex is not None:
-				print("Warning: ignoring \"regex\" parameter",
-					"(\"filepath\" is specified)")
 			self.__readautomaton__(filepath=filepath, sep=sep)
 
 		elif regex is not None:
-			self.load_regex(regex)
+			self.load_regex(regex, null_symbol=null_symbol)
+
+		elif grammar is not None:
+			self.load_grammar(grammar, null_symbol=null_symbol)
 
 	def __readautomaton__(self, filepath, sep=","):
 		# Regex used to get each state set of 
@@ -158,6 +247,105 @@ class Automaton:
 			vertex_b in self.final_states) or \
 			(vertex_a not in self.final_states and
 			vertex_b not in self.final_states)
+
+	def __buildnewautomaton__(self, automaton, null_symbol="e"):
+		"""
+			This method unify two automatons structure,
+			needed for both operations of concatenation and
+			union and, by consequence, intersection.
+
+			Basics for all mentioned operation:
+			-	Expand the transition matrix, containing
+				all states to both alphabets
+
+				(transit_func : (Q1 U Q2) X (A1 U A2) -> (Q1 U Q2),
+				where Q1 and Q2 are the states of automaton 1 and 2
+				respectivelly and A1 and A2 are the alphabet of
+				automatons 1 and 2, respectivelly).
+
+			-	The resultant alphabet has the two alphabets
+				plus the null transition symbol
+
+		"""
+		unified_transit_mat = copy.deepcopy(self.transit_matrix)
+
+		# Add undefined transitions for all states of the current
+		# automaton to the symbols of the second automaton alphabet
+		# which are not in the current automaton alphabet
+		for vertex in self.transit_matrix:
+			for symbol in automaton.alphabet + [null_symbol]:
+				if symbol not in unified_transit_mat[vertex]:
+					unified_transit_mat[vertex][symbol] = set()
+				else:
+					if type(unified_transit_mat[vertex][symbol]) != type(set()):
+						unified_transit_mat[vertex][symbol] = \
+							{unified_transit_mat[vertex][symbol]}
+
+		# Verify if second automaton states has conflicting names/id
+		# in relation of the first automaton
+		second_transit_mat = copy.deepcopy(automaton.transit_matrix)
+		rename_struct = {}
+		for vertex in automaton.transit_matrix:
+			if vertex in unified_transit_mat:
+				new_vertex_label = vertex + "B"
+				rename_struct[vertex] = new_vertex_label
+				second_transit_mat[new_vertex_label] = second_transit_mat.pop(vertex)
+
+		for vertex in second_transit_mat:
+			for symbol in automaton.alphabet:
+				if type(second_transit_mat[vertex][symbol]) != type(set()):
+					second_transit_mat[vertex][symbol] = \
+						{second_transit_mat[vertex][symbol]}
+
+				for target_vertex in second_transit_mat[vertex][symbol]:
+					if target_vertex and target_vertex in rename_struct:
+						second_transit_mat[vertex][symbol] = \
+							rename_struct[target_vertex]
+
+		# Don't forget the final state list
+		second_final_states = copy.deepcopy(automaton.final_states)
+		for state in second_final_states:
+			if state in self.final_states:
+				second_final_states.remove(state)
+				second_final_states.update({state + "B"})
+
+		# Neither the initial state
+		second_initial_state = copy.copy(automaton.initial_state)
+		second_initial_state += "B" if second_initial_state \
+			in self.transit_matrix else ""
+
+		# Unify both transit matrix and add undefined transitions to
+		# the second automaton states for symbols in current automaton
+		# alphabet which are not present in the second automaton alpha-
+		# bet.
+		for vertex in second_transit_mat:
+			unified_transit_mat[vertex] = second_transit_mat[vertex]
+
+			for symbol in self.alphabet + [null_symbol]:
+				if symbol not in unified_transit_mat[vertex]:
+					unified_transit_mat[vertex][symbol] = set()
+				else:
+					if type(unified_transit_mat[vertex][symbol]) != type(set()):
+						unified_transit_mat[vertex][symbol] = \
+							{unified_transit_mat[vertex][symbol]}
+
+		# Construct new alphabet. New alphabet must not have
+		# repeated symbols and must contain null transition symbol
+		unified_alphabet = copy.copy(self.alphabet)
+		for symbol in automaton.alphabet + [null_symbol]:
+			if symbol not in unified_alphabet:
+				unified_alphabet += [symbol]
+
+		return unified_transit_mat, unified_alphabet, \
+			second_initial_state, second_final_states
+
+	def __stateidsintegrity__(self, state_list, 
+		state_id, fill_symbol="@"):
+		
+		while state_id in state_list:
+			state_id += fill_symbol
+
+		return state_id
 
 	def print(self, undefined_symbol="-", sort_state_names=False):
 		print("Automaton transition matrix:")
@@ -355,96 +543,6 @@ class Automaton:
 
 		return complementary
 
-	def __buildnewautomaton__(self, automaton, null_symbol="e"):
-		"""
-			This method unify two automatons structure,
-			needed for both operations of concatenation and
-			union and, by consequence, intersection.
-
-			Basics for all mentioned operation:
-			-	Expand the transition matrix, containing
-				all states to both alphabets
-
-				(transit_func : (Q1 U Q2) X (A1 U A2) -> (Q1 U Q2),
-				where Q1 and Q2 are the states of automaton 1 and 2
-				respectivelly and A1 and A2 are the alphabet of
-				automatons 1 and 2, respectivelly).
-
-			-	The resultant alphabet has the two alphabets
-				plus the null transition symbol
-
-		"""
-		unified_transit_mat = copy.deepcopy(self.transit_matrix)
-
-		# Add undefined transitions for all states of the current
-		# automaton to the symbols of the second automaton alphabet
-		# which are not in the current automaton alphabet
-		for vertex in self.transit_matrix:
-			for symbol in automaton.alphabet + [null_symbol]:
-				if symbol not in unified_transit_mat[vertex]:
-					unified_transit_mat[vertex][symbol] = set()
-				else:
-					if type(unified_transit_mat[vertex][symbol]) != type(set()):
-						unified_transit_mat[vertex][symbol] = \
-							{unified_transit_mat[vertex][symbol]}
-
-		# Verify if second automaton states has conflicting names/id
-		# in relation of the first automaton
-		second_transit_mat = copy.deepcopy(automaton.transit_matrix)
-		rename_struct = {}
-		for vertex in automaton.transit_matrix:
-			if vertex in unified_transit_mat:
-				new_vertex_label = vertex + "B"
-				rename_struct[vertex] = new_vertex_label
-				second_transit_mat[new_vertex_label] = second_transit_mat.pop(vertex)
-
-		for vertex in second_transit_mat:
-			for symbol in automaton.alphabet:
-				if type(second_transit_mat[vertex][symbol]) != type(set()):
-					second_transit_mat[vertex][symbol] = \
-						{second_transit_mat[vertex][symbol]}
-
-				for target_vertex in second_transit_mat[vertex][symbol]:
-					if target_vertex and target_vertex in rename_struct:
-						second_transit_mat[vertex][symbol] = \
-							rename_struct[target_vertex]
-
-		# Don't forget the final state list
-		second_final_states = copy.deepcopy(automaton.final_states)
-		for state in second_final_states:
-			if state in self.final_states:
-				second_final_states.remove(state)
-				second_final_states.update({state + "B"})
-
-		# Neither the initial state
-		second_initial_state = copy.copy(automaton.initial_state)
-		second_initial_state += "B" if second_initial_state \
-			in self.transit_matrix else ""
-
-		# Unify both transit matrix and add undefined transitions to
-		# the second automaton states for symbols in current automaton
-		# alphabet which are not present in the second automaton alpha-
-		# bet.
-		for vertex in second_transit_mat:
-			unified_transit_mat[vertex] = second_transit_mat[vertex]
-
-			for symbol in self.alphabet + [null_symbol]:
-				if symbol not in unified_transit_mat[vertex]:
-					unified_transit_mat[vertex][symbol] = set()
-				else:
-					if type(unified_transit_mat[vertex][symbol]) != type(set()):
-						unified_transit_mat[vertex][symbol] = \
-							{unified_transit_mat[vertex][symbol]}
-		# Construct new alphabet. New alphabet must not have
-		# repeated symbols and must contain null transition symbol
-		unified_alphabet = copy.copy(self.alphabet)
-		for symbol in automaton.alphabet + [null_symbol]:
-			if symbol not in unified_alphabet:
-				unified_alphabet += [symbol]
-
-		return unified_transit_mat, unified_alphabet, \
-			second_initial_state, second_final_states
-
 	def concatenate(self, automaton, null_symbol="e"):
 		"""
 			The concatenation of two automatons:
@@ -475,17 +573,6 @@ class Automaton:
 			final_states = second_final_states,
 			initial_state = self.initial_state)
 
-	def __stateidsintegrity__(self, state_list, \
-		initial_state_id, final_state_id):
-		
-		while initial_state_id in state_list:
-			initial_state_id += "@"
-
-		while final_state_id in state_list:
-			final_state_id += "@"
-
-		return initial_state_id, final_state_id
-
 	def union(self, automaton, initial_state_id="US", 
 		final_state_id="UF", null_symbol="e"):
 
@@ -508,8 +595,10 @@ class Automaton:
 			second_initial_state, second_final_states = \
 				self.__buildnewautomaton__(automaton, null_symbol)
 
-		initial_state_id, final_state_id = self.__stateidsintegrity__(\
-			unified_transit_mat.keys(), initial_state_id, final_state_id)
+		initial_state_id = self.__stateidsintegrity__(\
+			unified_transit_mat.keys(), initial_state_id)
+		final_state_id = self.__stateidsintegrity__(\
+			unified_transit_mat.keys(), final_state_id)
 
 		# Create a new dummy initial state and connect
 		# it to both initial states of both automatons
@@ -712,7 +801,9 @@ class Automaton:
 		# End of minimization, return minimal automaton
 		return minimal
 
-	def glud(self, dfa=False, initial_symbol="S", null_symbol="e"):
+	def grammar(self, dfa=False, initial_symbol="S", 
+		null_symbol="e", gen_output=False):
+
 		# First, the automaton must be an DFA
 		if not dfa:
 			dfa_automaton = self.nfae_to_nfa()
@@ -720,31 +811,55 @@ class Automaton:
 		else:
 			dfa_automaton = self.copy()
 
-		glud_list = OrderedDict()
-		glud_list[initial_symbol] = ["(" + self.initial_state + ")"]
+		urlg_list = OrderedDict()
+		urlg_list[initial_symbol] = ["(" + self.initial_state + ")"]
 
 		for state in self.transit_matrix:
-			glud_list[state] = []
+			urlg_list[state] = []
 
 			for symbol in self.alphabet:
 				if self.transit_matrix[state][symbol]:
-					glud_list[state].append(symbol + \
+					urlg_list[state].append(symbol + \
 						"(" + self.transit_matrix[state][symbol] + ")")
 
-			if not glud_list[state]:
-				glud_list.pop(state)
+			if not urlg_list[state]:
+				urlg_list.pop(state)
 
 		for final_state in self.final_states:
 
-			if final_state not in glud_list:
-				glud_list[final_state] = []
+			if final_state not in urlg_list:
+				urlg_list[final_state] = []
 
-			glud_list[final_state].append(null_symbol)
+			urlg_list[final_state].append(null_symbol)
 
-		return glud_list
+		if gen_output:
+			print(",".join(self.alphabet), "\n", 
+				initial_symbol, sep="")
+			for variable in urlg_list:
+				for rules in urlg_list[variable]:
+					print(variable, "->", rules)
 
-	def load_glud(self, filepath):
-		pass
+		return urlg_list
+
+	def load_grammar(self, filepath):
+		"""
+			The given grammar must be in the type
+			"Unitary Right Linear Grammar" (URLG), which
+			means that only a maximum of a single terminal
+			symbol must be given in each rule and all terminal
+			symbols must be strictly in the left of the variables.
+			Example:
+
+			S -> a(A)
+			A -> b(A)
+			A -> c(B)
+			B -> c(A)
+			B -> e
+
+			Where {a, b, c} are terminal symbols, {S, A, B} are va-
+			riables and "e" is the null transition symbol (a.k.a. 
+			lambda).
+		"""
 		
 if __name__ == "__main__":
 	import sys
@@ -777,15 +892,16 @@ if __name__ == "__main__":
 	c_min = c.minimize()
 	c_min.print()
 
-	print("\n-- GLUD --")
-	glud = d.glud()
-	for variable in glud:
-		for rules in glud[variable]:
-			print(variable, "->", rules)
+	print("\n-- Unitary Right Linear Grammar --")
+	gram = d.grammar(gen_output=True)
 
 	print("\n-- Union --")
 	uni = d.union(d)
 	uni.print()
+	
+	print("\n-- Intersection --")
+	inter = d.intersection(d)
+	inter.print()
 	
 	print("\n-- Intersection --")
 	inter = d.intersection(d)
