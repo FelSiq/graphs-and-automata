@@ -1,0 +1,10 @@
+a,b,c
+S,A,B,C
+S
+S -> a(A)
+A -> b(B)
+A -> a(C)
+C -> e
+B -> b
+B -> (C)
+B -> (S)
