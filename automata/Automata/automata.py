@@ -76,6 +76,7 @@ class Automaton:
 					form. The model of the input file must follow the pattern given below:
 
 					<terminal symbols list separated by "sep">
+					<Variable symbols list separated by "sep">
 					<initial variable identifier>
 					<s_a> -> symbol_x(<s_i>)
 					<s_b> -> symbol_y(<s_j>)
@@ -87,6 +88,7 @@ class Automaton:
 
 					Example:
 					a,b,c
+					S,A,B
 					S
 					S -> a(A)
 					A -> b(A)
@@ -287,7 +289,11 @@ class Automaton:
 		rename_struct = {}
 		for vertex in automaton.transit_matrix:
 			if vertex in unified_transit_mat:
-				new_vertex_label = vertex + "B"
+				new_vertex_label = self.__stateidsintegrity__(\
+					unified_transit_mat.keys(), 
+					vertex, 
+					fill_symbol="B")
+
 				rename_struct[vertex] = new_vertex_label
 				second_transit_mat[new_vertex_label] = second_transit_mat.pop(vertex)
 
@@ -305,14 +311,21 @@ class Automaton:
 		# Don't forget the final state list
 		second_final_states = copy.deepcopy(automaton.final_states)
 		for state in second_final_states:
-			if state in self.final_states:
+			if state in self.transit_matrix:
 				second_final_states.remove(state)
-				second_final_states.update({state + "B"})
+
+				new_vertex_label = self.__stateidsintegrity__(\
+					unified_transit_mat.keys(), state, 
+					fill_symbol="B")
+
+				second_final_states.update({new_vertex_label})
 
 		# Neither the initial state
 		second_initial_state = copy.copy(automaton.initial_state)
-		second_initial_state += "B" if second_initial_state \
-			in self.transit_matrix else ""
+		second_initial_state = self.__stateidsintegrity__(\
+			self.transit_matrix.keys(), 
+			second_initial_state, 
+			fill_symbol="B")
 
 		# Unify both transit matrix and add undefined transitions to
 		# the second automaton states for symbols in current automaton
@@ -621,9 +634,6 @@ class Automaton:
 			final_states={final_state_id},
 			transit_matrix=unified_transit_mat)
 
-	def load_regex(self, regex):
-		pass
-
 	def intersection(self, 
 		automaton, 
 		sink_id="SINK", 
@@ -841,14 +851,19 @@ class Automaton:
 
 		return urlg_list
 
-	def load_grammar(self, filepath):
+	def load_grammar(self, 
+		filepath, 
+		sep=",", 
+		null_symbol="e", 
+		final_sink_id="SINK",
+		sink_null_transitions=True):
+
 		"""
-			The given grammar must be in the type
-			"Unitary Right Linear Grammar" (URLG), which
-			means that only a maximum of a single terminal
-			symbol must be given in each rule and all terminal
-			symbols must be strictly in the left of the variables.
-			Example:
+			The given grammar must be in the type "Unitary Right 
+			Linear Grammar" (URLG), which means that only a ma-
+			ximum of a single terminal symbol must be given in 
+			each rule and all terminal symbols must be strictly 
+			in the left of the variables. Example:
 
 			S -> a(A)
 			A -> b(A)
@@ -860,49 +875,204 @@ class Automaton:
 			riables and "e" is the null transition symbol (a.k.a. 
 			lambda).
 		"""
+
+		with open(filepath) as f:
+			self.alphabet = f.readline().strip().split(sep) + \
+				[null_symbol]
+			var_list = f.readline().strip().split(sep)
+			self.initial_state = f.readline().strip()
+			self.final_states = set()
+
+			self.transit_matrix = OrderedDict()
+			for var in var_list:
+				self.transit_matrix[var] = {symbol : set() \
+					for symbol in self.alphabet}
+
+			re_readline = re.compile("""
+				\s*(\w+)		# Read right variable identifier
+				\s*->			# Read predefined transition symbol
+				\s*([^\(\s]+)?		# Read terminal symbol, if any
+				\s*(?:\(([^\)\s]+)\))?	# Read transition state, if any
+				""", re.IGNORECASE | re.VERBOSE)
+
+			# Sink final state which all empty strings or terminal symbol only
+			# rules will point to. If not used in the end, it must be removed.
+			self.transit_matrix[final_sink_id] = \
+				{symbol : set() for symbol in self.alphabet}
+
+			pop_sink_state = True
+			for line in f:
+				match = re_readline.search(line)
+				if match:
+					ascendent, symbol, incident = match.groups()
+					if incident is None:
+						# If no incident node is given, the transition
+						# will be to the additional sink final state
+						# artificially created previously
+						if symbol == null_symbol and not sink_null_transitions:
+							self.final_states.update({ascendent})
+						else:
+							self.transit_matrix[ascendent][symbol].update({final_sink_id})
+							pop_sink_state = False
+					else:
+						if symbol is not None:
+							# If no terminal symbol is given, then 
+							# assume it is a null transition
+							self.transit_matrix[ascendent][symbol].update({incident})
+						else:
+							self.transit_matrix[ascendent][null_symbol].update({incident})
+
+			if pop_sink_state:
+				self.transit_matrix.remove(final_sink_id)
+			else:
+				self.final_states.update({final_sink_id})
+
+
+	def kleene_star(self, 
+		start_state_id="KS", 
+		end_state_id="KE", 
+		null_symbol="e"):
+
 		
+
+	def load_regex(self, regex, null_symbol="e"):
+		pass
+
 if __name__ == "__main__":
 	import sys
 
-	if len(sys.argv) < 2:
-		print("usage:", sys.argv[0], "<filepath>")
+	if len(sys.argv) < 3:
+		print("""
+			Program used to work with Finite Automatons, just for 
+			study purposes. This implementation tries to follow 
+			stricly the formal definitions from theoretical com-
+			puter science and formal languages.""".replace("\t\t\t", ""), 
+			"\n-----------------------------------------",
+			"\nusage:", sys.argv[0], "<filepath> <operation> [...] [-simpleout]",
+			"""
+			-----------------------------------------
+			Operation list: <operation> can be (case insensitive):
+
+			0. nop: 
+				0.0. Description:
+				Just load and print the automaton.
+
+			1. convnfa	
+				1.0. Extra arguments:
+				[null symbol, default is "e"]: Symbol to represent the null
+				transition symbol / empty string (also known as "lambda" 
+				symbol in theoretical computer science and formal languages).
+
+				1.1. Description:
+				Transform a given NFAe (Non-deterministic Finite Automaton 
+				with Null Transitions) to NFA (Non-deterministic Finite Au-
+				tomaton)
+
+			2. convdfa 
+				2.0. Extra arguments:
+				[-stateprefix string, default is "DFA"]: Prefix for state na-
+				mes of the created DFA automaton.
+
+				2.1. Description:
+				Transform a given NFA (Non-deterministic Finite Automaton)
+				to DFA (Deterministic Finite Automaton).
+
+			3. grammar 
+				3.0. Extra arguments:
+				[-nullsymbol symbol, default is "e"]
+				[-initialstate variable, default is "S"]: Variable label to
+				use as first grammar symbol.
+
+				3.1. Description:
+				generate a URLG (Unitary Right Linear Grammar) of a given
+				DFA (Deterministic Finite Automaton).
+
+			4. loadgrammar 
+				4.0. Extra arguments:
+				[-sep separator, default is ","]: separator used in the in-
+				put file.
+				[-sinknull, enabled by default]: should epsilons transitions
+				become transitions to a sink state (if enable)? or should 
+				they promote the state correspondent of the variable to a 
+				final state instead (if disabled)?
+
+				4.1. Description:
+				generate the automaton of the given URLG (Unitary Right Linear
+				Grammar).
+
+			5. compl 
+				5.0. Extra arguments:
+				[-sinkid sink_state_name, default is "SINK"]:
+
+				5.1. Description:
+				generate the complementary automaton.
+
+			6. min 
+				6.0. Extra arguments:
+				[-sinkid sink_state_name, defualt is "SINK"] 
+				[-isdfa, disabled by default]:
+
+				6.1. Description:
+				minimize the given automaton.
+
+			7. intersec 
+				7.0. Mandatory arguments:
+				<filepath2>: path of the second automaton to promote a
+				intersection.
+
+				7.1. Extra arguments:
+				[-sinkid sink_state_name, default is "SINK"]: name of the
+				sink state, if necessary, to fullfil the transition matrices.
+
+				7.2 Description:
+
+			8. union
+
+			9. concat
+
+			10. loadregex
+			""".replace("\t\t\t", ""))
 		exit(1)
 
-	print("-- Original automaton --")
-	g = Automaton(sys.argv[1])
-	g.print()
+	#print("-- Original automaton --")
+	#g = Automaton(sys.argv[1])
+	#g.print()
 
-	print("\n-- NFA automaton --")
-	ne = g.nfae_to_nfa()
-	ne.print()
+	#print("\n-- NFA automaton --")
+	#ne = g.nfae_to_nfa()
+	#ne.print()
 
-	print("\n-- DFA automaton --")
-	d = ne.nfa_to_dfa()
-	d.print()
+	#print("\n-- DFA automaton --")
+	#d = ne.nfa_to_dfa()
+	#d.print()
 
-	print("\n-- Minimal DFA automaton --")
-	d_min = d.minimize()
-	d_min.print()
+	#print("\n-- Minimal DFA automaton --")
+	#d_min = d.minimize()
+	#d_min.print()
 
-	print("\n-- Complementary automaton --")
-	c = d.complement()
-	c.print()
+	#print("\n-- Complementary automaton --")
+	#c = d.complement()
+	#c.print()
 
-	print("\n-- Minimal Complementary automaton --")
-	c_min = c.minimize()
-	c_min.print()
+	#print("\n-- Minimal Complementary automaton --")
+	#c_min = c.minimize()
+	#c_min.print()
 
-	print("\n-- Unitary Right Linear Grammar --")
-	gram = d.grammar(gen_output=True)
+	#print("\n-- Unitary Right Linear Grammar --")
+	#gram = d.grammar(gen_output=True)
 
-	print("\n-- Union --")
-	uni = d.union(d)
-	uni.print()
-	
-	print("\n-- Intersection --")
-	inter = d.intersection(d)
-	inter.print()
-	
-	print("\n-- Intersection --")
-	inter = d.intersection(d)
-	inter.print()
+	#print("\n-- Union --")
+	#uni = d.union(d)
+	#uni.print()
+	#
+	#print("\n-- Intersection --")
+	#inter = d.intersection(d)
+	#inter.print()
+	#
+	#print("\n-- Intersection --")
+	#inter = d.intersection(d)
+	#inter.print()
+
+	a=Automaton()
+	a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
+	a.print()
