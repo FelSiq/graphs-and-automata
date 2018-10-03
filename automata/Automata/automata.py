@@ -933,7 +933,7 @@ class Automaton:
 		end_state_id="KE", 
 		null_symbol="e"):
 
-		
+		pass
 
 	def load_regex(self, regex, null_symbol="e"):
 		pass
@@ -941,7 +941,7 @@ class Automaton:
 if __name__ == "__main__":
 	import sys
 
-	if len(sys.argv) < 3:
+	if len(sys.argv) < 2:
 		print("""
 			Program used to work with Finite Automatons, just for 
 			study purposes. This implementation tries to follow 
@@ -1034,45 +1034,45 @@ if __name__ == "__main__":
 			""".replace("\t\t\t", ""))
 		exit(1)
 
-	#print("-- Original automaton --")
-	#g = Automaton(sys.argv[1])
-	#g.print()
+	print("-- Original automaton --")
+	g = Automaton(sys.argv[1])
+	g.print()
 
-	#print("\n-- NFA automaton --")
-	#ne = g.nfae_to_nfa()
-	#ne.print()
+	print("\n-- NFA automaton --")
+	ne = g.nfae_to_nfa()
+	ne.print()
 
-	#print("\n-- DFA automaton --")
-	#d = ne.nfa_to_dfa()
-	#d.print()
+	print("\n-- DFA automaton --")
+	d = ne.nfa_to_dfa()
+	d.print()
 
-	#print("\n-- Minimal DFA automaton --")
-	#d_min = d.minimize()
-	#d_min.print()
+	print("\n-- Minimal DFA automaton --")
+	d_min = d.minimize()
+	d_min.print()
 
-	#print("\n-- Complementary automaton --")
-	#c = d.complement()
-	#c.print()
+	print("\n-- Complementary automaton --")
+	c = d.complement()
+	c.print()
 
-	#print("\n-- Minimal Complementary automaton --")
-	#c_min = c.minimize()
-	#c_min.print()
+	print("\n-- Minimal Complementary automaton --")
+	c_min = c.minimize()
+	c_min.print()
 
-	#print("\n-- Unitary Right Linear Grammar --")
-	#gram = d.grammar(gen_output=True)
+	print("\n-- Unitary Right Linear Grammar --")
+	gram = d.grammar(gen_output=True)
 
-	#print("\n-- Union --")
-	#uni = d.union(d)
-	#uni.print()
-	#
-	#print("\n-- Intersection --")
-	#inter = d.intersection(d)
-	#inter.print()
-	#
-	#print("\n-- Intersection --")
-	#inter = d.intersection(d)
-	#inter.print()
+	print("\n-- Union --")
+	uni = d.union(d)
+	uni.print()
+	
+	print("\n-- Intersection --")
+	inter = d.intersection(d)
+	inter.print()
+	
+	print("\n-- Intersection --")
+	inter = d.intersection(d)
+	inter.print()
 
-	a=Automaton()
-	a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
-	a.print()
+	#a=Automaton()
+	#a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
+	#a.print()
