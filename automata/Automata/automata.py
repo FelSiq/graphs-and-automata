@@ -877,8 +877,11 @@ class Automaton:
 		"""
 
 		with open(filepath) as f:
-			self.alphabet = f.readline().strip().split(sep) + \
-				[null_symbol]
+			self.alphabet = f.readline().strip().split(sep)
+
+			if null_symbol not in self.alphabet:
+				self.alphabet += [null_symbol]
+
 			var_list = f.readline().strip().split(sep)
 			self.initial_state = f.readline().strip()
 			self.final_states = set()
@@ -923,17 +926,75 @@ class Automaton:
 							self.transit_matrix[ascendent][null_symbol].update({incident})
 
 			if pop_sink_state:
-				self.transit_matrix.remove(final_sink_id)
+				self.transit_matrix.pop(final_sink_id)
 			else:
 				self.final_states.update({final_sink_id})
 
 
 	def kleene_star(self, 
-		start_state_id="KS", 
-		end_state_id="KE", 
+		initial_state_id="KS", 
+		final_state_id="KE", 
 		null_symbol="e"):
+		"""
+			The Kleene Start implementation is pretty simple I
+			would say. We need to
 
-		pass
+			1. Create a dummy end state which all automaton end states
+				will have a null transition to it.
+
+			2. Create a dummy start state which has null transitions
+				between both automaton start state and dummy end
+				state.
+
+			3. Create a null transition between all automaton final
+				states to its own start state.
+
+			Note that the Kleene Sum (+) := "regex" concatenated with
+			Regex's kleene star:
+
+				r+ := rr*
+		"""
+
+		ksaut = self.copy()
+
+		# Check if epsilon (null transition symbol) is not 
+		# in the alphabet already
+		if null_symbol not in ksaut.alphabet:
+			ksaut.alphabet += [null_symbol]
+			for state in ksaut.transit_matrix:
+				ksaut.transit_matrix[state][null_symbol] = set()
+
+		initial_state_id = ksaut.__stateidsintegrity__(\
+			ksaut.transit_matrix.keys(), initial_state_id)
+		final_state_id = ksaut.__stateidsintegrity__(\
+			ksaut.transit_matrix.keys(), final_state_id)
+
+		# Add dummy states
+		ksaut.transit_matrix[initial_state_id] = {}
+		ksaut.transit_matrix[final_state_id] = {}
+		for symbol in ksaut.alphabet:
+			ksaut.transit_matrix[final_state_id][symbol] = set()
+			ksaut.transit_matrix[initial_state_id][symbol] = set()
+
+		# Null transition between new start state and original
+		# automaton start state. Remembering also that the ini-
+		# tial dummy state must have a null transition to the 
+		# dummy final state
+		ksaut.transit_matrix[initial_state_id][null_symbol] = \
+			{ksaut.initial_state, final_state_id}
+
+		for final_state in ksaut.final_states:
+			# Insert null transitions between automaton original fi-
+			# nal states and new dummy final state and original st-
+			# art state
+			ksaut.transit_matrix[final_state][null_symbol].\
+				update({final_state_id, self.initial_state})
+
+		# Update new automatons start and end states list
+		ksaut.initial_state = initial_state_id
+		ksaut.final_states = [final_state_id]
+
+		return ksaut
 
 	def load_regex(self, regex, null_symbol="e"):
 		pass
@@ -941,7 +1002,7 @@ class Automaton:
 if __name__ == "__main__":
 	import sys
 
-	if len(sys.argv) < 2:
+	if len(sys.argv) < 3:
 		print("""
 			Program used to work with Finite Automatons, just for 
 			study purposes. This implementation tries to follow 
@@ -1023,56 +1084,115 @@ if __name__ == "__main__":
 				7.1. Extra arguments:
 				[-sinkid sink_state_name, default is "SINK"]: name of the
 				sink state, if necessary, to fullfil the transition matrices.
+				[-startid start_state_name, default is "US"]: specify the
+				desired name of the initial states that must be generated
+				during the automaton union in the intersection process. The
+				default id stands for "Union Start".
+				[-finalid final_state_name, default is "UF"]: same as the
+				parameter above, but this time for the final states. The de-
+				fault name stants for "Union End".
 
 				7.2 Description:
+				Promote a intersection between two given automatons. This
+				is equivalent to the regular expression ~(~r1 + ~r2), where
+				r1 and r2 are the generic regular expressions represented
+				by the given automatons. This uses the DeMorgan's law, whi-
+				ch tells that 
+			
+					intersection := complement(
+					    union(
+					        complement(M1), 
+					        complement(M2)
+					        )
+					    )
 
 			8. union
+				8.0 Mandatory arguments
+				<filepath2>: path of the second automaton to promote a
+				union.
+
+					e-----> M1 >----e
+					|               |
+					s1              s2
+					|               |
+					e-----> M2 >----e
+					
+
+				8.1. Extra arguments:
+				[-sinkid sink_state_name, default is "SINK"]: name of the
+				sink state, if necessary, to fullfil the transition matrices.
+
+				8.2 Description:
+				Promote a union between two given automatons. This
+				is equivalent to the regular expression "+" or "|" (logical 
+				"or") operator.
 
 			9. concat
+				9.0 Mandatory arguments:
+				<filepath2>: path of the second automaton to promote a
+				simple concatenation.
 
-			10. loadregex
+					Automaton_1 -- e --> Automaton_2
+				
+				9.1 Description:
+				Simple concatenation of two given automatons, creating a null
+				transition between all final states of the first one and the
+				initial state of the second one.
+
+			10. kleenestar
+				10.0. Description:
+				Promote a "sucessive concatenation" of the given automaton.
+				This is equivalent to the regular expression "*" operator.
+
+			11. loadregex
+				Not implemented yet.
+
 			""".replace("\t\t\t", ""))
 		exit(1)
 
-	print("-- Original automaton --")
-	g = Automaton(sys.argv[1])
-	g.print()
+	#print("-- Original automaton --")
+	#g = Automaton(sys.argv[1])
+	#g.print()
 
-	print("\n-- NFA automaton --")
-	ne = g.nfae_to_nfa()
-	ne.print()
+	#print("\n-- NFA automaton --")
+	#ne = g.nfae_to_nfa()
+	#ne.print()
 
-	print("\n-- DFA automaton --")
-	d = ne.nfa_to_dfa()
-	d.print()
+	#print("\n-- DFA automaton --")
+	#d = ne.nfa_to_dfa()
+	#d.print()
 
-	print("\n-- Minimal DFA automaton --")
-	d_min = d.minimize()
-	d_min.print()
+	#print("\n-- Minimal DFA automaton --")
+	#d_min = d.minimize()
+	#d_min.print()
 
-	print("\n-- Complementary automaton --")
-	c = d.complement()
-	c.print()
+	#print("\n-- Complementary automaton --")
+	#c = d.complement()
+	#c.print()
 
-	print("\n-- Minimal Complementary automaton --")
-	c_min = c.minimize()
-	c_min.print()
+	#print("\n-- Minimal Complementary automaton --")
+	#c_min = c.minimize()
+	#c_min.print()
 
-	print("\n-- Unitary Right Linear Grammar --")
-	gram = d.grammar(gen_output=True)
+	#print("\n-- Unitary Right Linear Grammar --")
+	#gram = d.grammar(gen_output=True)
 
-	print("\n-- Union --")
-	uni = d.union(d)
-	uni.print()
-	
-	print("\n-- Intersection --")
-	inter = d.intersection(d)
-	inter.print()
-	
-	print("\n-- Intersection --")
-	inter = d.intersection(d)
-	inter.print()
+	#print("\n-- Union --")
+	#uni = d.union(d)
+	#uni.print()
+	#
+	#print("\n-- Intersection --")
+	#inter = d.intersection(d)
+	#inter.print()
+	#
+	#print("\n-- Intersection --")
+	#inter = d.intersection(d)
+	#inter.print()
 
 	#a=Automaton()
 	#a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
 	#a.print()
+
+	m=Automaton(filepath=sys.argv[1])
+	k=m.kleene_star()
+	k.print()
