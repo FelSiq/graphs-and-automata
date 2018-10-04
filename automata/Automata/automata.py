@@ -1119,7 +1119,7 @@ if __name__ == "__main__":
 
 					e-----> M1 >----e
 					|               |
-					s1              s2
+					US              UF
 					|               |
 					e-----> M2 >----e
 					
@@ -1156,11 +1156,23 @@ if __name__ == "__main__":
 
 			10. kleenestar
 				10.0. Extra arguments:
+				[-startid start_state_name, default is "KS"]: specify the
+				desired name of the initial states that must be generated.
+				The default id stands for "Kleene Start".
+				[-finalid final_state_name, default is "KE"]: same as the
+				parameter above, but this time for the final states. The de-
+				fault name stants for "Kleene End".
 				[-nullsymbol symbol, default is "e"]
-
+				
 				10.1. Description:
 				Promote a "sucessive concatenation" of the given automaton.
 				This is equivalent to the regular expression "*" operator.
+
+					KS --e-> start_state (...) end_state --e-> KF
+					|           |                    |          |
+					|           e----------<---------e          |
+					|                                           |
+					e---------------------->--------------------e
 
 			11. loadregex
 				Not implemented yet.
