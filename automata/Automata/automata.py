@@ -1012,9 +1012,13 @@ if __name__ == "__main__":
 			"\nusage:", sys.argv[0], "<filepath> <operation> [...] [-simpleout]",
 			"""
 			-----------------------------------------
+			if "-simpleout" is enabled, the produced automaton will be printed
+			as this program input format, so it can be feed again with another
+			operation easily.
+			-----------------------------------------
 			Operation list: <operation> can be (case insensitive):
 
-			0. nop: 
+			0. print: 
 				0.0. Description:
 				Just load and print the automaton.
 
@@ -1064,6 +1068,7 @@ if __name__ == "__main__":
 			5. compl 
 				5.0. Extra arguments:
 				[-sinkid sink_state_name, default is "SINK"]:
+				[-isdfa, if automaton is DFA, disabled by default]:
 
 				5.1. Description:
 				generate the complementary automaton.
@@ -1082,6 +1087,7 @@ if __name__ == "__main__":
 				intersection.
 
 				7.1. Extra arguments:
+				[-nullsymbol symbol, default is "e"]
 				[-sinkid sink_state_name, default is "SINK"]: name of the
 				sink state, if necessary, to fullfil the transition matrices.
 				[-startid start_state_name, default is "US"]: specify the
@@ -1092,7 +1098,7 @@ if __name__ == "__main__":
 				parameter above, but this time for the final states. The de-
 				fault name stants for "Union End".
 
-				7.2 Description:
+				7.2. Description:
 				Promote a intersection between two given automatons. This
 				is equivalent to the regular expression ~(~r1 + ~r2), where
 				r1 and r2 are the generic regular expressions represented
@@ -1107,7 +1113,7 @@ if __name__ == "__main__":
 					    )
 
 			8. union
-				8.0 Mandatory arguments
+				8.0. Mandatory arguments
 				<filepath2>: path of the second automaton to promote a
 				union.
 
@@ -1119,28 +1125,40 @@ if __name__ == "__main__":
 					
 
 				8.1. Extra arguments:
-				[-sinkid sink_state_name, default is "SINK"]: name of the
-				sink state, if necessary, to fullfil the transition matrices.
+				[-nullsymbol symbol, default is "e"]
+				[-startid start_state_name, default is "US"]: specify the
+				desired name of the initial states that must be generated.
+				The default id stands for "Union Start".
+				[-finalid final_state_name, default is "UF"]: same as the
+				parameter above, but this time for the final states. The de-
+				fault name stants for "Union End".
 
-				8.2 Description:
+				8.2. Description:
 				Promote a union between two given automatons. This
 				is equivalent to the regular expression "+" or "|" (logical 
 				"or") operator.
 
 			9. concat
-				9.0 Mandatory arguments:
+				9.0. Mandatory arguments:
 				<filepath2>: path of the second automaton to promote a
 				simple concatenation.
 
 					Automaton_1 -- e --> Automaton_2
+
+				9.1. Extra arguments:
+				[-nullsymbol symbol, default is "e"]: null transition / empty
+				string symbol (also known as "lambda" transition).
 				
-				9.1 Description:
+				9.2. Description:
 				Simple concatenation of two given automatons, creating a null
 				transition between all final states of the first one and the
 				initial state of the second one.
 
 			10. kleenestar
-				10.0. Description:
+				10.0. Extra arguments:
+				[-nullsymbol symbol, default is "e"]
+
+				10.1. Description:
 				Promote a "sucessive concatenation" of the given automaton.
 				This is equivalent to the regular expression "*" operator.
 
