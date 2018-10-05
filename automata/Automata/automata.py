@@ -364,7 +364,11 @@ class Automaton:
 
 		return state_id
 
-	def print(self, undefined_symbol="-", sort_state_names=False):
+	def print(self, undefined_symbol="-", sort_state_names=False, gen_input_file=False):
+		if gen_input_file:
+			self.gen_input_file()
+			return
+
 		print("Automaton transition matrix:")
 
 		max_id_len = 4 + max([len(state) \
@@ -826,20 +830,20 @@ class Automaton:
 			dfa_automaton = self.copy()
 
 		urlg_list = OrderedDict()
-		urlg_list[initial_symbol] = ["(" + self.initial_state + ")"]
+		urlg_list[initial_symbol] = ["(" + dfa_automaton.initial_state + ")"]
 
-		for state in self.transit_matrix:
+		for state in dfa_automaton.transit_matrix:
 			urlg_list[state] = []
 
-			for symbol in self.alphabet:
-				if self.transit_matrix[state][symbol]:
+			for symbol in dfa_automaton.alphabet:
+				if dfa_automaton.transit_matrix[state][symbol]:
 					urlg_list[state].append(symbol + \
-						"(" + self.transit_matrix[state][symbol] + ")")
+						"(" + dfa_automaton.transit_matrix[state][symbol] + ")")
 
 			if not urlg_list[state]:
 				urlg_list.pop(state)
 
-		for final_state in self.final_states:
+		for final_state in dfa_automaton.final_states:
 
 			if final_state not in urlg_list:
 				urlg_list[final_state] = []
@@ -847,7 +851,7 @@ class Automaton:
 			urlg_list[final_state].append(null_symbol)
 
 		if gen_output:
-			print(",".join(self.alphabet), "\n", 
+			print(",".join(dfa_automaton.alphabet), "\n", 
 				initial_symbol, sep="")
 			for variable in urlg_list:
 				for rules in urlg_list[variable]:
@@ -1210,13 +1214,14 @@ class Automaton:
 if __name__ == "__main__":
 	import sys
 
-	if len(sys.argv) < 2:
+	if len(sys.argv) < 3:
 		print("""Program used to work with Finite Automatons, just for 
 			study purposes. This implementation tries to follow 
 			stricly the formal definitions from theoretical com-
 			puter science and formal languages.""".replace("\t\t\t", ""), 
 			"\n-----------------------------------------",
-			"\nusage:", sys.argv[0], "<filepath> <operation> [...] [-simpleout]",
+			"\nusage:", sys.argv[0], "<filepath or regular expression*> <operation> [...] [-simpleout]",
+			"\n(*Regular expression accepted only when <operation>=loadregex, otherwise give always filepath)",
 			"""
 			-----------------------------------------
 			if "-simpleout" is enabled, the produced automaton will be printed
@@ -1231,8 +1236,8 @@ if __name__ == "__main__":
 
 			1. convnfa	
 				1.0. Extra arguments:
-				[null symbol, default is "e"]: Symbol to represent the null
-				transition symbol / empty string (also known as "lambda" 
+				[-nullsymbol null_symbol, default is "e"]: Symbol to represent 
+				the null transition symbol / empty string (also known as "lambda" 
 				symbol in theoretical computer science and formal languages).
 
 				1.1. Description:
@@ -1244,49 +1249,62 @@ if __name__ == "__main__":
 				2.0. Extra arguments:
 				[-stateprefix string, default is "DFA"]: Prefix for state na-
 				mes of the created DFA automaton.
+				[-nfa]: tells program that the input file is already a NFA 
+				(Non-Deterministic Finite Automaton), in order to speed up
+				the conversion process.
 
 				2.1. Description:
-				Transform a given NFA (Non-deterministic Finite Automaton)
-				to DFA (Deterministic Finite Automaton).
+				Transform a given NFAe (Non-Deterministic Finite Automaton with
+				Null Transitions) or NFA (Non-Deterministic Finite Automaton)
+				into a DFA (Deterministic Finite Automaton).
 
 			3. grammar 
 				3.0. Extra arguments:
 				[-nullsymbol symbol, default is "e"]
 				[-initialstate variable, default is "S"]: Variable label to
 				use as first grammar symbol.
+				[-dfa, default is disabled]: tell program that the given
+				input automaton is already a DFA (Deterministic Finite Au-
+				tomaton), in order to speed up building process.
 
 				3.1. Description:
-				generate a URLG (Unitary Right Linear Grammar) of a given
+				Generate a URLG (Unitary Right Linear Grammar) of a given
 				DFA (Deterministic Finite Automaton).
 
 			4. loadgrammar 
 				4.0. Extra arguments:
 				[-sep separator, default is ","]: separator used in the in-
 				put file.
-				[-sinknull, enabled by default]: should epsilons transitions
-				become transitions to a sink state (if enable)? or should 
-				they promote the state correspondent of the variable to a 
-				final state instead (if disabled)?
+				[-nosinknull]: if enabled, empty string transitions will
+				promote current variable to a final state instead of transf-
+				erring it's transition to a dummy sink final state.
 
 				4.1. Description:
-				generate the automaton of the given URLG (Unitary Right Linear
+				Generate the automaton of the given URLG (Unitary Right Linear
 				Grammar).
 
 			5. compl 
 				5.0. Extra arguments:
-				[-sinkid sink_state_name, default is "SINK"]:
-				[-isdfa, if automaton is DFA, disabled by default]:
+				[-sinkid sink_state_name, default is "SINK"]: Name of the
+				state that must be generated in order to fullfil the given
+				automaton transition matrix. If transition matrix is already
+				"full" (no undefined transitions), then this state will not
+				be necessary at all and this argument will be useless.
+				[-dfa, disabled by default]: tells program that the input
+				file is already a DFA (Deterministic Finite Automaton), in
+				order to speed up the process.
 
 				5.1. Description:
-				generate the complementary automaton.
+				Generate the complementary automaton.
 
 			6. min 
 				6.0. Extra arguments:
-				[-sinkid sink_state_name, defualt is "SINK"] 
-				[-isdfa, disabled by default]:
+				[-dfa, disabled by default]: tells program that the input
+				file is already a DFA (Deterministic Finite Automaton), in
+				order to speed up the process.
 
 				6.1. Description:
-				minimize the given automaton.
+				Minimize the given automaton.
 
 			7. intersec 
 				7.0. Mandatory arguments:
@@ -1382,56 +1400,199 @@ if __name__ == "__main__":
 					e---------------------->--------------------e
 
 			11. loadregex
-				Not implemented yet.
+				11.0. Mandatory arguments:
+				Please note that, exceptionally in this option, the "filepath"
+				argument is substituted by a regular expression pattern. So,
+				the program usage changes to
+			
+				<progname> <regex pattern> <loadregex> [...] [-simpleout]
+				
+				11.1. Extra arguments:
+				[-dfa]: should regular expression output automaton be trans-
+				formed into a DFA (Deterministic Finite Automaton)?
+				[-min]: should output automaton be minimized? Please note
+				that this argument imply in -dfa also, so giving both is
+				redundant.
 
+				11.2: Description:
+				Transform a given regular expression pattern into a Finite
+				Automaton. The regular expression must contain only four
+				types of operators:
+
+					OPERATOR	SYMBOL
+					Kleene Sum 	+
+					Kleene Star 	*
+					Or 		|
+					Concatenation 	<no symbol needed>
+
+				Parenthesis (and also nested parenthesis) are allowed.
+			-----------------------------------------
 			""".replace("\t\t\t", ""))
 		exit(1)
 
-	#print("-- Original automaton --")
-	#g = Automaton(sys.argv[1])
-	#g.print()
+	# Load up some program arguments
+	filepath = sys.argv[1]
+	operation = sys.argv[2].lower()
+	simpleout = ("-simpleout" in sys.argv)
+	isdfa = ("-dfa" in sys.argv)
+	isnfa = ("-nfa" in sys.argv)
 
-	#print("\n-- NFA automaton --")
-	#ne = g.nfae_to_nfa()
-	#ne.print()
+	try:
+		null_symbol = sys.argv[1 + sys.argv.index("-nullsymbol")]
+	except:
+		null_symbol = "e"
 
-	#print("\n-- DFA automaton --")
-	#d = ne.nfa_to_dfa()
-	#d.print()
+	try:
+		sinkid = sys.argv[1 + sys.argv.index("-sinkid")]
+	except:
+		sinkid = "SINK"
 
-	#print("\n-- Minimal DFA automaton --")
-	#d_min = d.minimize()
-	#d_min.print()
+	try:
+		startid = sys.argv[1 + sys.argv.index("-startid")]
+	except:
+		startid = None
 
-	#print("\n-- Complementary automaton --")
-	#c = d.complement()
-	#c.print()
+	try:
+		finalid = sys.argv[1 + sys.argv.index("-finalid")]
+	except:
+		finalid = None
 
-	#print("\n-- Minimal Complementary automaton --")
-	#c_min = c.minimize()
-	#c_min.print()
+	# Load automaton, if needed
+	if operation not in {"loadregex", "loadgrammar"}:
+		aut = Automaton(filepath)
 
-	#print("\n-- Unitary Right Linear Grammar --")
-	#gram = d.grammar(gen_output=True)
+	# Check selected operation
+	if operation == "print":
+		aut.print(gen_input_file=simpleout)
 
-	#print("\n-- Union --")
-	#uni = d.union(d)
-	#uni.print()
-	#
-	#print("\n-- Intersection --")
-	#inter = d.intersection(d)
-	#inter.print()
-	#
-	##a=Automaton()
-	##a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
-	##a.print()
+	elif operation == "convnfa":
+		aut = aut.nfae_to_nfa(null_symbol=null_symbol)
+		aut.print(gen_input_file=simpleout)
 
-	#print("\n-- Kleene Star --")
-	#m=Automaton(filepath=sys.argv[1])
-	#k=m.kleene_star()
-	#k.print()
+	elif operation == "convdfa":
+		try:
+			state_prefix = sys.argv[1 + sys.argv.index("-stateprefix")]
+		except:
+			state_prefix = "DFA"
 
-	m = Automaton().load_regex(sys.argv[1])
-	m = m.nfae_to_nfa()
-	m = m.nfa_to_dfa()
-	m.print()
+		if not isnfa:
+			aut = aux.nfae_to_nfa(null_symbol=null_symbol)
+
+		aut = aut.nfa_to_dfa(
+			null_symbol=null_symbol, 
+			state_prefix=state_prefix)
+
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "grammar":
+		try:
+			initial_state = sys.argv[1 + sys.argv.index("-initialstate")]
+		except:
+			initial_state = "S"
+
+		aut.grammar(dfa=isdfa, 
+			initial_symbol=initial_state, 
+			null_symbol=null_symbol, 
+			gen_output=True)
+
+	elif operation == "loadgrammar":
+		try:
+			sep = sys.argv[1 + sys.argv.index("-sep")]
+		except:
+			sep = ","
+
+		nosinknull = ("-nosinknull" in sys.argv)
+
+		aut = Automaton()
+
+		aut.load_grammar(
+			filepath=filepath, 
+			sep=sep, 
+			null_symbol=null_symbol, 
+			final_sink_id=sinkid,
+			sink_null_transitions=nosinknull)
+
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "compl":
+		aut = aut.complement(dfa=isdfa, sink_id=sinkid)
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "min":
+		aut = aut.minimize(dfa=isdfa, sink_id=sinkid)
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "intersec":
+		aut_b = Automaton(sys.argv[3])
+
+		if startid is None:
+			startid = "US"
+
+		if finalid is None:
+			finalid = "UE"
+
+		aut = aut.intersection(
+			automaton=aut_b,
+			sink_id=sinkid,
+			null_symbol=null_symbol,
+			initial_state_id=startid,
+			final_state_id=finalid)
+
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "union":
+		aut_b = Automaton(sys.argv[3])
+
+		if startid is None:
+			startid = "US"
+
+		if finalid is None:
+			finalid = "UE"
+
+		aut = aut.union(
+			automaton=aut_b,
+			null_symbol=null_symbol,
+			initial_state_id=startid,
+			final_state_id=finalid)
+
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "concat":
+		aut_b = Automaton(sys.argv[3])
+
+		aut = aut.concatenate(
+			automaton=aut_b,
+			null_symbol=null_symbol)
+
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "kleenestar":
+		if startid is None:
+			startid = "KS"
+
+		if finalid is None:
+			finalid = "KE"
+
+		aut = aut.kleene_star(
+			initial_state_id=startid,
+			final_state_id=finalid,
+			null_symbol=null_symbol)
+
+		aut.print(gen_input_file=simpleout)
+
+	elif operation == "loadregex":
+		aut = Automaton(regex=sys.argv[1])
+
+		minarg = ("-min" in sys.argv)
+		
+		if minarg or dfa:
+			aut = aut.nfae_to_nfa(null_symbol=null_symbol)
+			aut = aut.nfa_to_dfa()
+
+		if minarg:
+			aut = aut.minimize(sink_id=sinkid)
+		
+		aut.print(gen_input_file=simpleout)
+	else:
+		print("Error: unknown operation \"" + operation + "\"")
+		
