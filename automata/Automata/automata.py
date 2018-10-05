@@ -1081,20 +1081,22 @@ class Automaton:
 		if regex is None or not regex:
 			return
 
+		print(operators_list)
+
 		# Skip possible initial parenthesis
 		i = 0
 		while regex[i] == "(":
 			i += 1
 
-		# Skip first symbol
-		i += 1
-
 		# Process input string
-		while i < len(regex):
-			if (regex[i-1] == ")" or regex[i-1] not in operators_list) \
-				and regex[i] not in operators_list:
+		while i < len(regex) - 1:
+			cur_sym = regex[i]
+			next_sym = regex[i+1]
+			if ((cur_sym not in operators_list and next_sym not in operators_list)) or \
+				(next_sym == "(" and cur_sym not in {"(", "|"}):
 
-				regex = regex[:i] + concat_symbol + regex[i:]
+				print(regex[i], regex[i+1])
+				regex = regex[:i+1] + concat_symbol + regex[i+1:]
 				i += 1
 			i += 1
 
@@ -1128,6 +1130,8 @@ class Automaton:
 			kleene_star=kleene_star, 
 			kleene_sum=kleene_sum)
 
+		print(regex)
+
 		# Symbol made "concatenation operator" adopted as 
 		# kleene sum symbol, because I know I already ride 
 		# Kleene Sum operations off at this point, so I'm 
@@ -1149,11 +1153,13 @@ class Automaton:
 			concat_symbol=concat_operator,
 			operators_list=set(shunting_yard_argdict.\
 				keys()).union({"(", ")"}))
+		print(regex)
 
 		# Transform given regex to reverse polish notation
 		# using shunting-yard algorithm
 		rpn_regex = self.__shuntingyard__(regex, 
 			operators_set = shunting_yard_argdict)
+		print(rpn_regex)
 
 		# Now, we only need to solve
 		automatons_stack = []
