@@ -198,10 +198,13 @@ class Automaton:
 		if not keep_sink_state:
 			self.transit_matrix.pop(state_id)
 
-	def __getnulltransitions__(self, null_symbol="e"):
+	def __getnulltransitions__(self, state=None, null_symbol="e"):
 		null_transitions = {}
 
-		for state in self.transit_matrix:
+		state_list = self.transit_matrix.keys() \
+			if state is None else [state]
+		
+		for state in state_list:
 			# Promote a blind search starting in every possible
 			# state of the transition matrix. DFS was choosen 
 			# because it uses less memory than the BFS.
@@ -449,7 +452,10 @@ class Automaton:
 				aux = set()
 
 				for nfa_state in mapping[cur_state]:
-					aux.update(self.transit_matrix[nfa_state][c])
+					update_aux_val = self.transit_matrix[nfa_state][c]
+					if type(update_aux_val) != type(set()):
+						update_aux_val = {update_aux_val}
+					aux.update(update_aux_val)
 
 				if aux:
 					if self.__searchset__(mapping, aux) is None:
@@ -478,7 +484,7 @@ class Automaton:
 			nfa.alphabet.remove(null_symbol)
 
 		# First, calculate T_e(p) for all states p from NFAe
-		null_transitions = self.__getnulltransitions__(null_symbol)
+		null_transitions = self.__getnulltransitions__(null_symbol=null_symbol)
 
 		# Each entry of the NFA transit matrix is in the form
 		# T_NFA(p, c) = T_NFAe_e(T_NFAe(T_NFAe_e(p), c))
@@ -1118,11 +1124,11 @@ class Automaton:
 
 	def load_regex(self, 
 		regex, 
-		remove_whitespaces=False,
 		null_symbol="e", 
 		or_operator="|", 
 		kleene_star="*", 
-		kleene_sum="+"):
+		kleene_sum="+",
+		remove_whitespaces=False):
 
 		if remove_whitespaces:
 			regex = re.sub("\s+", "", regex)
@@ -1211,6 +1217,43 @@ class Automaton:
 
 		return self
 
+	def run(self, string, null_symbol="e"):
+		if self.transit_matrix is None:
+			return False
+
+		# Initial state + expand null transitions
+		cur_state_set = {self.initial_state}.union(\
+			self.__getnulltransitions__(\
+				self.initial_state, 
+				null_symbol=null_symbol))
+
+		for symbol in string:
+
+			# No remaining current states
+			if not cur_state_set:
+				return False
+
+			# Expand cur symbol transitions
+			new_states_set = set()
+			for cur_state in cur_state_set:
+				if symbol in self.transit_matrix[cur_state]:
+					cur_symbol_set = self.transit_matrix[cur_state][symbol]
+					if type(cur_symbol_set) != type(set()):
+						cur_symbol_set = {cur_symbol_set}
+					new_states_set.update(cur_symbol_set)
+
+			cur_state_set = new_states_set
+
+			# Expand null transitions
+			for state in new_states_set:
+				cur_state_set.update(self.__getnulltransitions__(state=state, 
+					null_symbol=null_symbol))
+
+		if cur_state_set.intersection(self.final_states):
+			return True
+
+		return False
+
 if __name__ == "__main__":
 	import sys
 
@@ -1220,11 +1263,14 @@ if __name__ == "__main__":
 			stricly the formal definitions from theoretical com-
 			puter science and formal languages.""".replace("\t\t\t", ""), 
 			"\n-----------------------------------------",
-			"\nusage:", sys.argv[0], "<filepath or regular expression*> <operation> [...] [-simpleout]",
+			"\nusage:", sys.argv[0], "<filepath or regular expression*> <operation> [...] [-simpleout] [-run string]",
 			"\n(*Regular expression accepted only when <operation>=loadregex, otherwise give always filepath)",
 			"""
 			-----------------------------------------
-			if "-simpleout" is enabled, the produced automaton will be printed
+			The "-run" parameter can be used to pass a input string to the pro-
+			duced automaton, in order to check if it accepts or rejects it.
+			-----------------------------------------
+			If "-simpleout" is enabled, the produced automaton will be printed
 			as this program input format, so it can be feed again with another
 			operation easily.
 			-----------------------------------------
@@ -1438,6 +1484,11 @@ if __name__ == "__main__":
 	isnfa = ("-nfa" in sys.argv)
 
 	try:
+		input_string = sys.argv[1 + sys.argv.index("-run")]
+	except:
+		input_string = None
+
+	try:
 		null_symbol = sys.argv[1 + sys.argv.index("-nullsymbol")]
 	except:
 		null_symbol = "e"
@@ -1595,4 +1646,11 @@ if __name__ == "__main__":
 		aut.print(gen_input_file=simpleout)
 	else:
 		print("Error: unknown operation \"" + operation + "\"")
-		
+		input_string = None
+
+	if input_string is not None:
+		res = aut.run(input_string)
+		print("Input string:", 
+			input_string, 
+			"\nstatus:", 
+			"accepted" if res else "rejected")
