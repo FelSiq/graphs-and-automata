@@ -1,6 +1,7 @@
 from collections import OrderedDict
 import copy
 import re
+import regex as reg
 
 class Automaton:
 	def __init__(self,
@@ -303,10 +304,13 @@ class Automaton:
 					second_transit_mat[vertex][symbol] = \
 						{second_transit_mat[vertex][symbol]}
 
-				for target_vertex in second_transit_mat[vertex][symbol]:
+				for target_vertex in copy.copy(second_transit_mat[vertex][symbol]):
 					if target_vertex and target_vertex in rename_struct:
-						second_transit_mat[vertex][symbol] = \
-							rename_struct[target_vertex]
+						#second_transit_mat[vertex][symbol] = \
+						#	rename_struct[target_vertex]
+						second_transit_mat[vertex][symbol].remove(target_vertex)
+						second_transit_mat[vertex][symbol].update(\
+							{rename_struct[target_vertex]})
 
 		# Don't forget the final state list
 		second_final_states = copy.deepcopy(automaton.final_states)
@@ -576,8 +580,8 @@ class Automaton:
 		# Add null transitions between first automaton final
 		# states and second automaton initial state
 		for final_state in self.final_states:
-			unified_transit_mat[final_state][null_symbol] = \
-				{second_initial_state}
+			unified_transit_mat[final_state]\
+				[null_symbol].update({second_initial_state})
 
 		# Return concatenated automaton
 		return Automaton(
@@ -992,12 +996,210 @@ class Automaton:
 
 		# Update new automatons start and end states list
 		ksaut.initial_state = initial_state_id
-		ksaut.final_states = [final_state_id]
+		ksaut.final_states = {final_state_id}
 
 		return ksaut
 
-	def load_regex(self, regex, null_symbol="e"):
-		pass
+	def __shuntingyard__(self, string, operators_set):
+
+		# Preprocessing the input string
+		pattern = list(operators_set.keys()) + ["(", ")"]
+		if "-" in pattern:
+			pattern.remove("-")
+			pattern.insert(0, "-")
+		pattern = "\\" + "\\".join(pattern)
+		pattern = "([" + pattern + "]|[^" + pattern + "]+)"
+		input_array = re.findall(pattern, string)
+		
+		ans = []
+		operator_stack = []
+
+		for c in input_array:
+			if c not in operators_set and c != "(" and c != ")":
+				ans.append(c)
+
+			elif c in operators_set:
+				# Pop operator stack until the top operator has higher
+				# priority
+				while operator_stack and \
+					c in operators_set and \
+					operator_stack[-1] in operators_set and \
+					operators_set[operator_stack[-1]] > operators_set[c]:
+					ans.append(operator_stack.pop())
+
+				operator_stack.append(c)
+
+			elif c == "(":
+				operator_stack.append(c)
+
+			elif c == ")":
+				# Pop operator stack until founding a matching "("
+				while operator_stack[-1] != "(":
+					ans.append(operator_stack.pop())
+
+				# Discard ")"
+				operator_stack.pop(-1)
+
+		while operator_stack:
+			ans.append(operator_stack.pop())
+
+		return ans
+
+	def __sumtostar__(self, regex, kleene_star="*", kleene_sum="+"):
+		# Tranforms all r+ (Kleene Sum) to rr* (Kleene Star).
+		# Note that this same logic can be applied if "?" ope-
+		# rator is implemented (r? := (r|e), where "e" is the null
+		# string)
+
+		stack = []
+		i = 0
+		j = 0
+		reg_size = len(regex)
+		while i < reg_size:
+			if regex[i] == kleene_sum:
+				j = i-1
+
+				if regex[j] == ")":
+					stack.append(regex[j])
+					while stack:
+						j -= 1
+						if regex[j] == ")":
+							stack.append(")")
+						elif regex[j] == "(":
+							stack.pop()
+
+				regex = regex[:j] + 2 * regex[j:i] + "*" + regex[i+1:]
+				reg_size = len(regex)
+			i += 1
+
+		return regex
+
+	def __fillconcatop__(self, regex, concat_symbol, operators_list):
+		# Fill regex with an artificialy made concatenation
+		# symbol
+
+		if regex is None or not regex:
+			return
+
+		# Skip possible initial parenthesis
+		i = 0
+		while regex[i] == "(":
+			i += 1
+
+		# Skip first symbol
+		i += 1
+
+		# Process input string
+		while i < len(regex):
+			if (regex[i-1] == ")" or regex[i-1] not in operators_list) \
+				and regex[i] not in operators_list:
+
+				regex = regex[:i] + concat_symbol + regex[i:]
+				i += 1
+			i += 1
+
+		return regex
+
+	def __atomicautomaton__(self, symbol, start_state_id, end_state_id):
+		return Automaton(
+			alphabet=[symbol],
+			initial_state = start_state_id,
+			final_states = {end_state_id},
+			transit_matrix = {
+				start_state_id : {symbol : {end_state_id} },
+				end_state_id : {symbol : set()}
+			})
+
+	def load_regex(self, 
+		regex, 
+		remove_whitespaces=False,
+		null_symbol="e", 
+		or_operator="|", 
+		kleene_star="*", 
+		kleene_sum="+"):
+
+		if remove_whitespaces:
+			regex = re.sub("\s+", "", regex)
+
+		# Preprocess kleene_sum to concatenation of
+		# regex and regex with kleene star:
+		# r+ := rr*
+		regex = self.__sumtostar__(regex, 
+			kleene_star=kleene_star, 
+			kleene_sum=kleene_sum)
+
+		# Symbol made "concatenation operator" adopted as 
+		# kleene sum symbol, because I know I already ride 
+		# Kleene Sum operations off at this point, so I'm 
+		# free to reuse this now-invalid symbol.
+		concat_operator = kleene_sum
+
+		# Construct a precedence score for all operators.
+		# Note that the "concat_operator" is artificially made
+		# for the concatenation operation.
+		shunting_yard_argdict = {
+			or_operator : 2, 
+			concat_operator : 3, 
+			kleene_star : 4
+		}
+
+		# Fill regex with a artificialy made "concatenation 
+		# operator".
+		regex = self.__fillconcatop__(regex,
+			concat_symbol=concat_operator,
+			operators_list=set(shunting_yard_argdict.\
+				keys()).union({"(", ")"}))
+
+		# Transform given regex to reverse polish notation
+		# using shunting-yard algorithm
+		rpn_regex = self.__shuntingyard__(regex, 
+			operators_set = shunting_yard_argdict)
+
+		# Now, we only need to solve
+		automatons_stack = []
+		counter = 0
+		while rpn_regex:
+			cur_state = rpn_regex.pop(0)
+			if cur_state in shunting_yard_argdict:
+				# Operator, check if it is unary ("kleene star")
+				# or binary ("or" or "concatenation").
+				if cur_state == kleene_star:
+					# Unary, pop a single operand from the
+					# automaton stack
+					automatons_stack.append(\
+						automatons_stack.pop().kleene_star(null_symbol=null_symbol))
+				else:
+					# Binary, pop two operands from the au-
+					# tomaton stack
+					automaton_b = automatons_stack.pop()
+					automaton_a = automatons_stack.pop()
+					if cur_state == or_operator:
+						# Or operator
+						automatons_stack.append(\
+							automaton_a.union(\
+								automaton_b, 
+								null_symbol=null_symbol))
+					else:
+						# Concatenation operator, for sure
+						automatons_stack.append(\
+							automaton_a.concatenate(\
+								automaton_b, 
+								null_symbol=null_symbol))
+			else:
+				# Operand, create automaton and
+				# stack it
+				automatons_stack.append(self.__atomicautomaton__(
+					symbol=cur_state, 
+					start_state_id = "S" + str(counter),
+					end_state_id = "F" + str(counter)))
+
+		result = automatons_stack.pop()
+		self.alphabet = result.alphabet
+		self.transit_matrix = result.transit_matrix
+		self.initial_state = result.initial_state
+		self.final_states = result.final_states
+
+		return self
 
 if __name__ == "__main__":
 	import sys
@@ -1179,46 +1381,51 @@ if __name__ == "__main__":
 			""".replace("\t\t\t", ""))
 		exit(1)
 
-	print("-- Original automaton --")
-	g = Automaton(sys.argv[1])
-	g.print()
+	#print("-- Original automaton --")
+	#g = Automaton(sys.argv[1])
+	#g.print()
 
-	print("\n-- NFA automaton --")
-	ne = g.nfae_to_nfa()
-	ne.print()
+	#print("\n-- NFA automaton --")
+	#ne = g.nfae_to_nfa()
+	#ne.print()
 
-	print("\n-- DFA automaton --")
-	d = ne.nfa_to_dfa()
-	d.print()
+	#print("\n-- DFA automaton --")
+	#d = ne.nfa_to_dfa()
+	#d.print()
 
-	print("\n-- Minimal DFA automaton --")
-	d_min = d.minimize()
-	d_min.print()
+	#print("\n-- Minimal DFA automaton --")
+	#d_min = d.minimize()
+	#d_min.print()
 
-	print("\n-- Complementary automaton --")
-	c = d.complement()
-	c.print()
+	#print("\n-- Complementary automaton --")
+	#c = d.complement()
+	#c.print()
 
-	print("\n-- Minimal Complementary automaton --")
-	c_min = c.minimize()
-	c_min.print()
+	#print("\n-- Minimal Complementary automaton --")
+	#c_min = c.minimize()
+	#c_min.print()
 
-	print("\n-- Unitary Right Linear Grammar --")
-	gram = d.grammar(gen_output=True)
+	#print("\n-- Unitary Right Linear Grammar --")
+	#gram = d.grammar(gen_output=True)
 
-	print("\n-- Union --")
-	uni = d.union(d)
-	uni.print()
-	
-	print("\n-- Intersection --")
-	inter = d.intersection(d)
-	inter.print()
-	
-	#a=Automaton()
-	#a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
-	#a.print()
+	#print("\n-- Union --")
+	#uni = d.union(d)
+	#uni.print()
+	#
+	#print("\n-- Intersection --")
+	#inter = d.intersection(d)
+	#inter.print()
+	#
+	##a=Automaton()
+	##a.load_grammar(filepath=sys.argv[1], sink_null_transitions=False)
+	##a.print()
 
-	print("\n-- Kleene Star --")
-	m=Automaton(filepath=sys.argv[1])
-	k=m.kleene_star()
-	k.print()
+	#print("\n-- Kleene Star --")
+	#m=Automaton(filepath=sys.argv[1])
+	#k=m.kleene_star()
+	#k.print()
+
+	m = Automaton().load_regex(sys.argv[1])
+	m = m.nfae_to_nfa()
+	m = m.nfa_to_dfa()
+	m.print()
