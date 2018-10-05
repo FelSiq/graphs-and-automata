@@ -198,11 +198,11 @@ class Automaton:
 		if not keep_sink_state:
 			self.transit_matrix.pop(state_id)
 
-	def __getnulltransitions__(self, state=None, null_symbol="e"):
+	def __getnulltransitions__(self, target=None, null_symbol="e"):
 		null_transitions = {}
 
 		state_list = self.transit_matrix.keys() \
-			if state is None else [state]
+			if target is None else [target]
 		
 		for state in state_list:
 			# Promote a blind search starting in every possible
@@ -229,6 +229,9 @@ class Automaton:
 						# Each reached state is a null_transition for
 						# the current state.
 						null_transitions[state].update({null_t_vertex})
+
+		if target is not None:
+			return null_transitions[target]
 
 		return null_transitions
 
@@ -1078,7 +1081,7 @@ class Automaton:
 						elif regex[j] == "(":
 							stack.pop()
 
-				regex = regex[:j] + 2 * regex[j:i] + "*" + regex[i+1:]
+				regex = regex[:j] + "(" + 2 * regex[j:i] + "*)" + regex[i+1:]
 				reg_size = len(regex)
 			i += 1
 
@@ -1091,8 +1094,6 @@ class Automaton:
 		if regex is None or not regex:
 			return
 
-		print(operators_list)
-
 		# Skip possible initial parenthesis
 		i = 0
 		while regex[i] == "(":
@@ -1103,9 +1104,10 @@ class Automaton:
 			cur_sym = regex[i]
 			next_sym = regex[i+1]
 			if ((cur_sym not in operators_list and next_sym not in operators_list)) or \
-				(next_sym == "(" and cur_sym not in {"(", "|"}):
+				(next_sym == "(" and cur_sym not in {"(", "|"}) or \
+				(cur_sym == ")" and next_sym not in {"(", "|"}) or \
+				(next_sym not in operators_list and cur_sym == "*"):
 
-				print(regex[i], regex[i+1])
 				regex = regex[:i+1] + concat_symbol + regex[i+1:]
 				i += 1
 			i += 1
@@ -1140,8 +1142,6 @@ class Automaton:
 			kleene_star=kleene_star, 
 			kleene_sum=kleene_sum)
 
-		print(regex)
-
 		# Symbol made "concatenation operator" adopted as 
 		# kleene sum symbol, because I know I already ride 
 		# Kleene Sum operations off at this point, so I'm 
@@ -1163,14 +1163,15 @@ class Automaton:
 			concat_symbol=concat_operator,
 			operators_list=set(shunting_yard_argdict.\
 				keys()).union({"(", ")"}))
+
 		print(regex)
 
 		# Transform given regex to reverse polish notation
 		# using shunting-yard algorithm
 		rpn_regex = self.__shuntingyard__(regex, 
 			operators_set = shunting_yard_argdict)
-		print(rpn_regex)
 
+		print(rpn_regex)
 		# Now, we only need to solve
 		automatons_stack = []
 		counter = 0
@@ -1224,7 +1225,7 @@ class Automaton:
 		# Initial state + expand null transitions
 		cur_state_set = {self.initial_state}.union(\
 			self.__getnulltransitions__(\
-				self.initial_state, 
+				target=self.initial_state, 
 				null_symbol=null_symbol))
 
 		for symbol in string:
@@ -1242,11 +1243,12 @@ class Automaton:
 						cur_symbol_set = {cur_symbol_set}
 					new_states_set.update(cur_symbol_set)
 
-			cur_state_set = new_states_set
+			cur_state_set = copy.copy(new_states_set)
 
 			# Expand null transitions
 			for state in new_states_set:
-				cur_state_set.update(self.__getnulltransitions__(state=state, 
+				cur_state_set.update(self.__getnulltransitions__(\
+					target=state, 
 					null_symbol=null_symbol))
 
 		if cur_state_set.intersection(self.final_states):
@@ -1636,7 +1638,7 @@ if __name__ == "__main__":
 
 		minarg = ("-min" in sys.argv)
 		
-		if minarg or dfa:
+		if minarg or isdfa:
 			aut = aut.nfae_to_nfa(null_symbol=null_symbol)
 			aut = aut.nfa_to_dfa()
 
@@ -1650,7 +1652,7 @@ if __name__ == "__main__":
 
 	if input_string is not None:
 		res = aut.run(input_string)
-		print("Input string:", 
+		print("\nRUNNING TEST:\nInput string:", 
 			input_string, 
 			"\nstatus:", 
 			"accepted" if res else "rejected")
