@@ -24,8 +24,13 @@ struct rubik_struct {
 #endif
 
 enum {
-	PACK_HEAPKEY,
-	PACK_GCOST=sizeof(float),
+	#if ENABLE_IDA_STAR
+		PACK_GCOST,
+
+	#else
+		PACK_HEAPKEY,
+		PACK_GCOST=sizeof(float),
+	#endif
 	PACK_MOVES,
 	PACK_SIZE
 };
@@ -218,7 +223,6 @@ static
 		package *new_item = malloc(sizeof(package));
 		memcpy(new_item->cur_config, r->INITIAL_CONFIG, sizeof(r->INITIAL_CONFIG));
 		new_item->cur_moves = malloc(PACK_SIZE * sizeof(unsigned char));
-		new_item->cur_moves[PACK_HEAPKEY] = 0.0;
 		new_item->cur_moves[PACK_GCOST] = 0;
 		new_item->cur_moves[PACK_MOVES] = '\0';
 	#else
@@ -239,12 +243,13 @@ int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 		register float new_heuristic_cost;
 
 		#if ENABLE_IDA_STAR
-			register package *cur_item_package,
+			package *cur_item_package,
 				*new_item_package = __empty_move__(r);
 			register unsigned char *cur_item, *new_item; 
 		#else 
 			register unsigned char *cur_item, 
 				*new_item = __empty_move__(); 
+			float *aux_h_pointer;
 		#endif
 
 		register unsigned char 
@@ -252,7 +257,6 @@ int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 			color, 
 			dir;
 
-		float *aux_h_pointer;
 		heap *minheap = heap_start();
 
 		#if ENABLE_IDA_STAR
@@ -321,18 +325,21 @@ int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 					new_item[PACK_GCOST] = cur_item[PACK_GCOST] + 1;
 					memcpy(new_item + PACK_MOVES, cur_item + PACK_MOVES, cur_item[PACK_GCOST]);
 					new_item[PACK_MOVES + cur_item[PACK_GCOST]] = color | DIR_SEQ[dir];
-					aux_h_pointer = (float *) new_item;
-					aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
+
+					#if ENABLE_IDA_STAR == 0
+						aux_h_pointer = (float *) new_item;
+						aux_h_pointer[PACK_HEAPKEY] = new_heuristic_cost + new_item[PACK_GCOST];
+					#endif
 					
 					#if ENABLE_IDA_STAR
 						// Turn minheap into maxheap reversing the key signal
-						aux_h_pointer[PACK_HEAPKEY] *= -1.0;
+						f_cost_total *= -1.0;
 
 						new_item_package = malloc(sizeof(package));
 						new_item_package->cur_moves = new_item;
 						memcpy(new_item_package->cur_config, r->config, sizeof(r->config));
 		
-						heap_push(minheap, new_item_package, aux_h_pointer[PACK_HEAPKEY]);
+						heap_push(minheap, new_item_package, f_cost_total);
 
 						} else {
 							next_threshold = MIN(next_threshold, f_cost_total);
@@ -346,7 +353,7 @@ int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 				} // End of DIR loop
 			} // End of COLOR loop
 
-			#if  ENABLE_IDA_STAR
+			#if ENABLE_IDA_STAR
 				// Heapsort on movement stack
 				color = heap_size(minheap);
 				while (color--) {

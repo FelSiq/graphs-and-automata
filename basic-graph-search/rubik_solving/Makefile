@@ -1,7 +1,7 @@
 SOURCE_PATH = ./src
 INCLUDE_PATH = ./include
 MAINFLAGS = -D INIT_CONFIG
-FLAGS = -Wall -I $(INCLUDE_PATH) -O3 -Wextra
+FLAGS = -Wall -I $(INCLUDE_PATH) -O3 -Wextra -D ENABLE_IDA_STAR
 OUTPUT_FILE = rubik-solver
 
 all: main.tag heap.tag stack.tag rubik.tag
