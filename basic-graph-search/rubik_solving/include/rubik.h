@@ -40,6 +40,15 @@
 #define OPPOSITE_COLORS(C1, C2) (((C1) ^ (C2)) == 1) 
 
 typedef unsigned char color_type;
+
+struct rubik_struct {
+	color_type config[COLOR_NUM][ROW_NUM][COL_NUM],
+		INITIAL_CONFIG[COLOR_NUM][ROW_NUM][COL_NUM],
+		*p_c[COLOR_NUM][ROW_NUM + 2][COL_NUM + 2],
+		aux_p_c[ROW_NUM + 2][COL_NUM + 2];
+	unsigned char sol_size, *solution, nil_pos;
+};
+
 typedef struct rubik_struct rubik;
 
 enum {

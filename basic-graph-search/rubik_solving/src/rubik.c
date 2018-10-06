@@ -8,14 +8,6 @@
 	#include <stack.h>
 #endif
 
-struct rubik_struct {
-	color_type config[COLOR_NUM][ROW_NUM][COL_NUM],
-		INITIAL_CONFIG[COLOR_NUM][ROW_NUM][COL_NUM],
-		*p_c[COLOR_NUM][ROW_NUM + 2][COL_NUM + 2],
-		aux_p_c[ROW_NUM + 2][COL_NUM + 2];
-	unsigned char sol_size, *solution, nil_pos;
-};
-
 #if ENABLE_IDA_STAR
 	typedef struct {
 		unsigned char *cur_moves;

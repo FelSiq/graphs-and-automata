@@ -5,16 +5,24 @@
 #define STACK_DEBUG 0
 
 struct stack_struct {
-	void ** restrict stack;
-	unsigned long int buffer_size;
+	#ifdef IN_STACK_WE_TRUST
+		void *restrict stack[STACK_INIT_BUFFER_SIZE];
+	#else
+		void ** restrict stack;
+		unsigned long int buffer_size;
+	#endif
+
 	unsigned long int size;
 };
+
 
 stack *stack_start() {
 	stack *s = malloc(sizeof(stack));
 	if (s != NULL) {
-		s->stack = malloc(sizeof(void *) * STACK_INIT_BUFFER_SIZE);
-		s->buffer_size = STACK_INIT_BUFFER_SIZE;
+		#ifndef IN_STACK_WE_TRUST
+			s->stack = malloc(sizeof(void *) * STACK_INIT_BUFFER_SIZE);
+			s->buffer_size = STACK_INIT_BUFFER_SIZE;
+		#endif
 		s->size = 0;
 	}
 	return s;
@@ -26,18 +34,22 @@ void *stack_pop(stack *s) {
 
 void stack_push(stack *s, void * restrict move) {
 	register const unsigned long int cur_size = ++s->size;
+	#ifndef IN_STACK_WE_TRUST
 	if (cur_size >= s->buffer_size) {
 		s->buffer_size *= 2;
 		s->stack = realloc(s->stack, sizeof(void *) * s->buffer_size);
 	}
+	#endif
 	s->stack[cur_size - 1] = move;
 }
 
 void stack_destroy(stack **s) {
 	if (s != NULL && *s != NULL) {
+		#ifndef IN_STACK_WE_TRUST
 		if ((*s)->stack != NULL) {
 			free((*s)->stack);
 		}
+		#endif
 		free(*s);
 		*s = NULL;
 	}

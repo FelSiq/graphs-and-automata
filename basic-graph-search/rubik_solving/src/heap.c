@@ -10,9 +10,17 @@
 		float key;
 	} heap_node;
 
+	#ifdef IN_STACK_WE_TRUST
+		#define HEAP_INIT_BUFFER_SIZE (12 * sizeof(heap_node))
+	#endif
+
 	struct heap_struct {
-		heap_node ** restrict heap;
-		unsigned long int buffer_size;
+		#ifdef IN_STACK_WE_TRUST
+			heap_node heap[HEAP_INIT_BUFFER_SIZE];
+		#else
+			heap_node ** restrict heap;
+			unsigned long int buffer_size;
+		#endif
 		unsigned long int size;
 	};
 #else
@@ -26,15 +34,17 @@
 heap *heap_start() {
 	heap *h = malloc(sizeof(heap));
 	if (h != NULL) {
-		h->heap = malloc(sizeof(
-		#if ENABLE_IDA_STAR
-			heap_node
-		#else
-			unsigned char *
-		#endif
-			) * HEAP_INIT_BUFFER_SIZE);
+		#ifndef IN_STACK_WE_TRUST
+			h->heap = malloc(sizeof(
+			#if ENABLE_IDA_STAR
+				heap_node
+			#else
+				unsigned char *
+			#endif
+				) * HEAP_INIT_BUFFER_SIZE);
 
-		h->buffer_size = HEAP_INIT_BUFFER_SIZE;
+			h->buffer_size = HEAP_INIT_BUFFER_SIZE;
+		#endif
 		h->size = 0;
 	}
 	return h;
@@ -48,10 +58,14 @@ void *heap_pop(heap *h) {
 		rchild_index = HEAP_RCHILD(cur_position);
 	register const unsigned long cur_size = --h->size;
 
-	#if ENABLE_IDA_STAR
-		void *
+	#ifndef IN_STACK_WE_TRUST
+		#if ENABLE_IDA_STAR
+			void *
+		#else
+			unsigned char *
+		#endif
 	#else
-		unsigned char *
+		heap_node
 	#endif
 		aux;
 
@@ -86,8 +100,10 @@ void *heap_pop(heap *h) {
 		}
 	}
 
-	#if ENABLE_IDA_STAR
-		free(h->heap[cur_size]);
+	#ifndef IN_STACK_WE_TRUST
+		#if ENABLE_IDA_STAR
+			free(h->heap[cur_size]);
+		#endif
 	#endif
 
 	return item;
@@ -105,30 +121,41 @@ void heap_push(heap *h,
 	register const unsigned long int cur_size = h->size;
 	register unsigned long int cur_position = cur_size;
 
-	#if ENABLE_IDA_STAR == 0
-		// If ENABLE_IDA_STAR is enabled, then the initial
-		// HEAP BUFFER must be fixed.
-		if (cur_size + 1 >= h->buffer_size) {
-			h->buffer_size *= 2;
-			h->heap = realloc(h->heap, sizeof(unsigned char *) * h->buffer_size);
-		}
+	#ifdef IN_STACK_WE_TRUST
+		h->heap[cur_size].item = item;
+		h->heap[cur_size].key = key;
+	#else
+		#if ENABLE_IDA_STAR == 0
+			// If ENABLE_IDA_STAR is enabled, then the initial
+			// HEAP BUFFER must be fixed.
+			if (cur_size + 1 >= h->buffer_size) {
+				h->buffer_size *= 2;
+				h->heap = realloc(h->heap, sizeof(unsigned char *) * h->buffer_size);
+			}
 
-		h->heap[cur_size] = key_and_move;
-	#else 
-		heap_node *hn = malloc(sizeof(heap_node));
-		hn->item = item;
-		hn->key = key;
-		h->heap[cur_size] = hn;
+			h->heap[cur_size] = key_and_move;
+		#else 
+			heap_node *hn = malloc(sizeof(heap_node));
+			hn->item = item;
+			hn->key = key;
+			h->heap[cur_size] = hn;
+		#endif
 	#endif
 
-	#if ENABLE_IDA_STAR
-		register heap_node
-			**master_node = h->heap + HEAP_MASTER(cur_position), 
-			**cur_node = h->heap + cur_position, *aux;
+	#ifndef IN_STACK_WE_TRUST
+		#if ENABLE_IDA_STAR
+			register heap_node
+				**master_node = h->heap + HEAP_MASTER(cur_position), 
+				**cur_node = h->heap + cur_position, *aux;
+		#else
+			register unsigned char
+				**master_node = h->heap + HEAP_MASTER(cur_position), 
+				**cur_node = h->heap + cur_position, *aux;
+		#endif
 	#else
-		register unsigned char
-			**master_node = h->heap + HEAP_MASTER(cur_position), 
-			**cur_node = h->heap + cur_position, *aux;
+		register heap_node
+			*master_node = h->heap + HEAP_MASTER(cur_position), 
+			*cur_node = h->heap + cur_position, aux;
 	#endif
 
 	while (HEAP_KEY(*master_node) > HEAP_KEY(*cur_node)) {
@@ -146,9 +173,11 @@ void heap_push(heap *h,
 
 void heap_destroy(heap **h) {
 	if (h != NULL && *h != NULL) {
-		if ((*h)->heap != NULL) {
-			free((*h)->heap);
-		}
+		#ifndef IN_STACK_WE_TRUST
+			if ((*h)->heap != NULL) {
+				free((*h)->heap);
+			}
+		#endif
 		free(*h);
 		*h = NULL;
 	}
