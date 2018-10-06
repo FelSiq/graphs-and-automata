@@ -5,7 +5,7 @@
 #define STACK_DEBUG 0
 
 struct stack_struct {
-	unsigned char ** restrict stack;
+	void ** restrict stack;
 	unsigned long int buffer_size;
 	unsigned long int size;
 };
@@ -13,7 +13,7 @@ struct stack_struct {
 stack *stack_start() {
 	stack *s = malloc(sizeof(stack));
 	if (s != NULL) {
-		s->stack = malloc(sizeof(unsigned char *) * STACK_INIT_BUFFER_SIZE);
+		s->stack = malloc(sizeof(void *) * STACK_INIT_BUFFER_SIZE);
 		s->buffer_size = STACK_INIT_BUFFER_SIZE;
 		s->size = 0;
 	}
@@ -24,11 +24,11 @@ void *stack_pop(stack *s) {
 	return s->stack[--s->size];
 }
 
-void stack_push(stack *s, unsigned char *restrict move) {
+void stack_push(stack *s, void * restrict move) {
 	register const unsigned long int cur_size = ++s->size;
 	if (cur_size >= s->buffer_size) {
 		s->buffer_size *= 2;
-		s->stack = realloc(s->stack, sizeof(unsigned char *) * s->buffer_size);
+		s->stack = realloc(s->stack, sizeof(void *) * s->buffer_size);
 	}
 	s->stack[cur_size - 1] = move;
 }

@@ -16,6 +16,13 @@ struct rubik_struct {
 	unsigned char sol_size, *solution, nil_pos;
 };
 
+#if ENABLE_IDA_STAR
+	typedef struct {
+		unsigned char *cur_moves;
+		color_type cur_config[COLOR_NUM][ROW_NUM][COL_NUM];
+	} package;
+#endif
+
 enum {
 	PACK_HEAPKEY,
 	PACK_GCOST=sizeof(float),
@@ -23,7 +30,7 @@ enum {
 	PACK_SIZE
 };
 
-static void __build_pointer_matrix__(rubik *restrict r) {
+static void __attribute__((cold)) __build_pointer_matrix__(rubik *restrict r) {
 
 	color_type *p_G_mat[ROW_NUM + 2][COL_NUM + 2] = {
 		{&r->nil_pos, &r->config[C_W][0][0], &r->config[C_W][0][1], &r->config[C_W][0][2], &r->nil_pos},
@@ -81,7 +88,7 @@ static void __build_pointer_matrix__(rubik *restrict r) {
 	memcpy(r->p_c[C_O], p_O_mat, sizeof(p_O_mat));
 }
 
-inline static float __heuristic_cost__(rubik const *const restrict r) {
+inline static float __attribute__((hot, pure)) __heuristic_cost__(rubik const *const restrict r) {
 	float h_cost = 0.0;
 
 	unsigned char color, row, col;
@@ -99,7 +106,8 @@ inline static float __heuristic_cost__(rubik const *const restrict r) {
 	return h_cost * 0.083334;
 }
 
-static void __mat_rot__(
+static void __attribute__((hot, nonnull)) 
+	__mat_rot__(
 	rubik *restrict r, 
 	unsigned char color_id, 
 	unsigned char clockwise,
@@ -125,7 +133,25 @@ static void __mat_rot__(
 	}
 }
 
-rubik *rubik_create(char *const restrict filepath) {
+static inline void __attribute__((hot, nonnull)) 
+	__recover_state__(
+	rubik *restrict r, 
+	unsigned char const *restrict const moves) {
+	
+	// Recover initial position	
+	memcpy(r->config, r->INITIAL_CONFIG, sizeof(r->INITIAL_CONFIG));
+
+	// Redo all moves through current state
+	unsigned char color, clockwise;
+	const unsigned char moves_count = moves[PACK_GCOST] + PACK_MOVES;
+	for (register size_t i = PACK_MOVES; i < moves_count; i++) {
+		color = moves[i] & MASK_COL;
+		clockwise = moves[i] & MASK_DIR;
+		__mat_rot__(r, color, clockwise, 1);
+	}
+}
+
+rubik * __attribute__((cold)) rubik_create(char *const restrict filepath) {
 	rubik *r = NULL;
 
 	FILE *restrict input_f = fopen(filepath, "r");
@@ -158,7 +184,7 @@ rubik *rubik_create(char *const restrict filepath) {
 	return r;
 }
 
-int rubik_print(const rubik *const restrict r) {
+int __attribute__((cold)) rubik_print(const rubik *const restrict r) {
 	if (r != NULL) {
 
 		register unsigned char i, row = 0, col = 0, color;
@@ -179,41 +205,49 @@ int rubik_print(const rubik *const restrict r) {
 	return 0;
 }
 
-static inline void __recover_state__(rubik *restrict r, 
-	unsigned char const *restrict const moves) {
-	
-	// Recover initial position	
-	memcpy(r->config, r->INITIAL_CONFIG, sizeof(r->INITIAL_CONFIG));
+static 
+#if ENABLE_IDA_STAR
+	package * __attribute__((hot))
+	__empty_move__(const rubik * restrict const r) {
+#else
+	unsigned char *	__attribute__((cold))
+	__empty_move__() {
+#endif
 
-	// Redo all moves through current state
-	unsigned char color, clockwise;
-	const unsigned char moves_count = moves[PACK_GCOST] + PACK_MOVES;
-	for (register size_t i = PACK_MOVES; i < moves_count; i++) {
-		color = moves[i] & MASK_COL;
-		clockwise = moves[i] & MASK_DIR;
-		__mat_rot__(r, color, clockwise, 1);
-	}
-}
-
-static unsigned char *__empty_move__() {
-	unsigned char *new_item = malloc(PACK_SIZE * sizeof(unsigned char));
-
-	#if ENABLE_IDA_STAR == 0
+	#if ENABLE_IDA_STAR
+		package *new_item = malloc(sizeof(package));
+		memcpy(new_item->cur_config, r->INITIAL_CONFIG, sizeof(r->INITIAL_CONFIG));
+		new_item->cur_moves = malloc(PACK_SIZE * sizeof(unsigned char));
+		new_item->cur_moves[PACK_HEAPKEY] = 0.0;
+		new_item->cur_moves[PACK_GCOST] = 0;
+		new_item->cur_moves[PACK_MOVES] = '\0';
+	#else
+		unsigned char *new_item = malloc(PACK_SIZE * sizeof(unsigned char));
 		new_item[PACK_HEAPKEY] = 0.0;
-	#endif
+		new_item[PACK_GCOST] = 0;
+		new_item[PACK_MOVES] = '\0';
 
-	new_item[PACK_GCOST] = 0;
-	new_item[PACK_MOVES] = '\0';
+	#endif
 
 	return new_item;
 }
 
-int rubik_solve(rubik *restrict r) {
+int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 	if (r != NULL) {
-		const unsigned char DIR_SEQ[] = {DIR_CLKWISE, DIR_C_CLKWISE, DIR_CLKWISE};
+		const unsigned char __attribute__((aligned(__BIGGEST_ALIGNMENT__))) 
+			DIR_SEQ[] = {DIR_CLKWISE, DIR_C_CLKWISE, DIR_CLKWISE};
 		register float new_heuristic_cost;
-		register unsigned char *cur_item, 
-			*new_item = __empty_move__(), 
+
+		#if ENABLE_IDA_STAR
+			register package *cur_item_package,
+				*new_item_package = __empty_move__(r);
+			register unsigned char *cur_item, *new_item; 
+		#else 
+			register unsigned char *cur_item, 
+				*new_item = __empty_move__(); 
+		#endif
+
+		register unsigned char 
 			not_completed = 1, 
 			color, 
 			dir;
@@ -223,7 +257,7 @@ int rubik_solve(rubik *restrict r) {
 
 		#if ENABLE_IDA_STAR
 			stack *movestack = stack_start();
-			stack_push(movestack, new_item);
+			stack_push(movestack, new_item_package);
 			register float threshold = __heuristic_cost__(r), 
 				next_threshold = threshold;
 			float f_cost_total;
@@ -249,21 +283,29 @@ int rubik_solve(rubik *restrict r) {
 					f_cost function of A*.
 				*/
 				if (stack_not_empty(movestack)) {
-					cur_item = stack_pop(movestack);
+					cur_item_package = stack_pop(movestack);
 				} else {
 					// Next IDDFS algorithm: init a empty
 					// move and update threshold
-					cur_item = __empty_move__();
+					cur_item_package = __empty_move__(r);
 					threshold = next_threshold + IDA_DEGREES_OF_FREEDOM;
 					next_threshold = INFINITY;
 				}
+
+				cur_item = cur_item_package->cur_moves;
+
+				// IDA* is memory constrained so it can happily
+				// keep a entire copy of the cube in item structure.
+				memcpy(r->config, cur_item_package->cur_config, sizeof(r->config));
+				free(cur_item_package);
 			#else
 				cur_item = heap_pop(minheap);
+
+				// Recover the configuration of popped snapshot
+				__recover_state__(r, cur_item);
+			
 			#endif
 
-			// Recover the configuration of popped snapshot
-			__recover_state__(r, cur_item);
-			
 			for (color = 0; (color < COLOR_NUM) && not_completed; color++) {
 				for (dir = 0; (dir < 2) && not_completed; dir++) {
 					__mat_rot__(r, color, DIR_SEQ[dir], 1);
@@ -285,7 +327,12 @@ int rubik_solve(rubik *restrict r) {
 					#if ENABLE_IDA_STAR
 						// Turn minheap into maxheap reversing the key signal
 						aux_h_pointer[PACK_HEAPKEY] *= -1.0;
-						heap_push(minheap, new_item);
+
+						new_item_package = malloc(sizeof(package));
+						new_item_package->cur_moves = new_item;
+						memcpy(new_item_package->cur_config, r->config, sizeof(r->config));
+		
+						heap_push(minheap, new_item_package, aux_h_pointer[PACK_HEAPKEY]);
 
 						} else {
 							next_threshold = MIN(next_threshold, f_cost_total);
@@ -299,7 +346,7 @@ int rubik_solve(rubik *restrict r) {
 				} // End of DIR loop
 			} // End of COLOR loop
 
-			#if ENABLE_IDA_STAR
+			#if  ENABLE_IDA_STAR
 				// Heapsort on movement stack
 				color = heap_size(minheap);
 				while (color--) {
@@ -311,26 +358,32 @@ int rubik_solve(rubik *restrict r) {
 		}
 
 		#if ENABLE_IDA_STAR
-			cur_item = stack_pop(movestack);
+			cur_item_package = stack_pop(movestack);
+			cur_item = cur_item_package->cur_moves;
+			memcpy(r->config, cur_item_package->cur_config, sizeof(r->config));
+			free(cur_item_package);
 		#else
 			cur_item = heap_pop(minheap);
+			__recover_state__(r, cur_item);
 		#endif
 
-		__recover_state__(r, cur_item);
 		r->sol_size = cur_item[PACK_GCOST];
 		r->solution = malloc(sizeof(unsigned char) * r->sol_size);
 		memcpy(r->solution, cur_item + PACK_MOVES, r->sol_size);
 		free(cur_item);
 
 		#if ENABLE_IDA_STAR
-		while (stack_not_empty(movestack)) {
-			new_item = stack_pop(movestack);
+			while (stack_not_empty(movestack)) {
+				new_item_package = stack_pop(movestack);
+				free(new_item_package->cur_moves);
+				free(new_item_package);
+			}
 		#else
-		for (register unsigned long i = heap_size(minheap); i; i--) {
-			new_item = heap_pop(minheap);
+			for (register unsigned long i = heap_size(minheap); i; i--) {
+				new_item = heap_pop(minheap);
+				free(new_item);
+			}
 		#endif
-			free(new_item);
-		}
 
 		#if ENABLE_IDA_STAR
 			stack_destroy(&movestack);
@@ -343,7 +396,7 @@ int rubik_solve(rubik *restrict r) {
 	return 0;
 }
 
-int rubik_solution(const rubik *const restrict r) {
+int __attribute__((cold)) rubik_solution(const rubik *const restrict r) {
 	if (r != NULL) {
 		unsigned char col, dir;
 		for (register unsigned char i = 0; i < r->sol_size; i++) {
@@ -358,7 +411,7 @@ int rubik_solution(const rubik *const restrict r) {
 	return 0;
 }
 
-int rubik_destroy(rubik **restrict r) {
+int __attribute__((cold)) rubik_destroy(rubik **restrict r) {
 	if (r != NULL && *r != NULL) {
 		if ((*r)->solution)
 			free((*r)->solution);
@@ -369,7 +422,7 @@ int rubik_destroy(rubik **restrict r) {
 	return 0;
 }
 
-int rubik_reinit(rubik *restrict r) {
+int __attribute__((cold)) rubik_reinit(rubik *restrict r) {
 	if (r != NULL) {
 		return (memcpy(r->INITIAL_CONFIG, 
 			r->config, sizeof(r->config)) != NULL);
@@ -377,7 +430,7 @@ int rubik_reinit(rubik *restrict r) {
 	return 0;
 }
 
-int rubik_rotate(rubik *restrict r, 
+int __attribute__((cold)) rubik_rotate(rubik *restrict r, 
 	unsigned char const color, 
 	unsigned char const clockwise) {
 

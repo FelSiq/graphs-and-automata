@@ -4,16 +4,36 @@
 
 #define HEAP_DEBUG 0
 
-struct heap_struct {
-	unsigned char ** restrict heap;
-	unsigned long int buffer_size;
-	unsigned long int size;
-};
+#if ENABLE_IDA_STAR
+	typedef struct {
+		void *item;
+		float key;
+	} heap_node;
+
+	struct heap_struct {
+		heap_node ** restrict heap;
+		unsigned long int buffer_size;
+		unsigned long int size;
+	};
+#else
+	struct heap_struct {
+		unsigned char ** restrict heap;
+		unsigned long int buffer_size;
+		unsigned long int size;
+	};
+#endif
 
 heap *heap_start() {
 	heap *h = malloc(sizeof(heap));
 	if (h != NULL) {
-		h->heap = malloc(sizeof(unsigned char *) * HEAP_INIT_BUFFER_SIZE);
+		h->heap = malloc(sizeof(
+		#if ENABLE_IDA_STAR
+			heap_node
+		#else
+			unsigned char *
+		#endif
+			) * HEAP_INIT_BUFFER_SIZE);
+
 		h->buffer_size = HEAP_INIT_BUFFER_SIZE;
 		h->size = 0;
 	}
@@ -21,14 +41,19 @@ heap *heap_start() {
 }
 
 void *heap_pop(heap *h) {
-	unsigned char *item = h->heap[0];
+	item_type *item = HEAP_HEAD_ITEM(h);
 
 	register unsigned long cur_position = 0, min_index,
 		lchild_index = HEAP_LCHILD(cur_position), 
 		rchild_index = HEAP_RCHILD(cur_position);
 	register const unsigned long cur_size = --h->size;
 
-	unsigned char *aux;
+	#if ENABLE_IDA_STAR
+		void *
+	#else
+		unsigned char *
+	#endif
+		aux;
 
 	// Swap head node with tail node
 	aux = h->heap[0];
@@ -61,10 +86,22 @@ void *heap_pop(heap *h) {
 		}
 	}
 
+	#if ENABLE_IDA_STAR
+		free(h->heap[cur_size]);
+	#endif
+
 	return item;
 }
 
-void heap_push(heap *h, unsigned char *restrict key_and_move) {
+void heap_push(heap *h, 
+	#if ENABLE_IDA_STAR
+		void *restrict item,
+		float const key
+	#else
+		unsigned char *restrict key_and_move
+	#endif
+	) {
+
 	register const unsigned long int cur_size = h->size;
 	register unsigned long int cur_position = cur_size;
 
@@ -75,14 +112,24 @@ void heap_push(heap *h, unsigned char *restrict key_and_move) {
 			h->buffer_size *= 2;
 			h->heap = realloc(h->heap, sizeof(unsigned char *) * h->buffer_size);
 		}
+
+		h->heap[cur_size] = key_and_move;
+	#else 
+		heap_node *hn = malloc(sizeof(heap_node));
+		hn->item = item;
+		hn->key = key;
+		h->heap[cur_size] = hn;
 	#endif
 
-	h->heap[cur_size] = key_and_move;
-
-	unsigned char *aux;
-	register unsigned char
-		**master_node = h->heap + HEAP_MASTER(cur_position), 
-		**cur_node = h->heap + cur_position;
+	#if ENABLE_IDA_STAR
+		register heap_node
+			**master_node = h->heap + HEAP_MASTER(cur_position), 
+			**cur_node = h->heap + cur_position, *aux;
+	#else
+		register unsigned char
+			**master_node = h->heap + HEAP_MASTER(cur_position), 
+			**cur_node = h->heap + cur_position, *aux;
+	#endif
 
 	while (HEAP_KEY(*master_node) > HEAP_KEY(*cur_node)) {
 		aux = *cur_node;
@@ -123,13 +170,22 @@ unsigned long int heap_size(heap const *restrict h) {
 			item = malloc(2*sizeof(unsigned char));
 			item[0] = rand();
 			item[1] = i * i;
-			heap_push(h, item);
+			#if ENABLE_IDA_STAR
+				heap_push(h, item, *item);
+			#else
+				heap_push(h, item);
+			#endif
 			printf("pushed (%d, %d)\n", item[0], item[1]);
 		}
 
 		for (int i = 0; i < 6; i++)
-			printf("[%d, %d]. (%d, %d)\n", HEAP_MASTER(i), i,
-				HEAP_KEY(h->heap[i]), h->heap[i][1]);
+			#if ENABLE_IDA_STAR
+				printf("[%d, %d]. (%f, %d)\n", HEAP_MASTER(i), i,
+					HEAP_KEY(h->heap[i]), ((int *)h->heap[i]->item)[1]);
+			#else
+				printf("[%d, %d]. (%d, %d)\n", HEAP_MASTER(i), i,
+					HEAP_KEY(h->heap[i]), h->heap[i][0]);
+			#endif
 
 		for (int i =0; i < 6; i++) {
 			item = heap_pop(h);
