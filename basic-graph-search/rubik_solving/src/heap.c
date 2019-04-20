@@ -190,6 +190,17 @@ unsigned long int heap_size(heap const *restrict h) {
 	return 0;
 }
 
+void heap_conditional_purge(heap *h) {
+	if (heap_size(h) > MAX_HEAP_SIZE) {
+		for (unsigned long i = KEEP_BEST_UNTIL; i < h->size; i++) {
+			free(h->heap[i]);
+		}
+		// Not necessary do adjust memory, as it would
+		// only slow down the insert process
+		h->size = KEEP_BEST_UNTIL;
+	}
+}
+
 #if HEAP_DEBUG == 1
 	int main(int argc, char *argv[]) {
 		heap *h = heap_start();

@@ -178,6 +178,12 @@ rubik * __attribute__((cold)) rubik_create(char *const restrict filepath) {
 		__build_pointer_matrix__(r);
 	} 
 
+	#if CONSTRAINT_HEAP_SIZE
+		printf("Enabled constraint of memory usage. "
+	 		"Current limit: %u heap nodes (keeping best %u).\n",
+	 		MAX_HEAP_SIZE, KEEP_BEST_UNTIL);
+	#endif
+
 	return r;
 }
 
@@ -233,7 +239,6 @@ int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 		const unsigned char __attribute__((aligned(__BIGGEST_ALIGNMENT__))) 
 			DIR_SEQ[] = {DIR_CLKWISE, DIR_C_CLKWISE, DIR_CLKWISE};
 		register float new_heuristic_cost;
-
 		#if ENABLE_IDA_STAR
 			package *cur_item_package,
 				*new_item_package = __empty_move__(r);
@@ -338,6 +343,9 @@ int __attribute__((hot)) rubik_solve(rubik *restrict r) {
 						}
 					#else
 						heap_push(minheap, new_item);
+						#if CONSTRAINT_HEAP_SIZE
+							heap_conditional_purge(minheap);
+						#endif
 					#endif
 
 					// Recover previous state

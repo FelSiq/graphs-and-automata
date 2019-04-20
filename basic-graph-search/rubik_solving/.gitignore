@@ -1,0 +1,4 @@
+*.swp
+*.o
+rubik-solver
+*/__pycache__/

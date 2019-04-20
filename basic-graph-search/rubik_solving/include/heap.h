@@ -1,6 +1,10 @@
 #ifndef __HEAP_H__
 #define __HEAP_H__
 
+#define CONSTRAINT_HEAP_SIZE 1
+#define MAX_HEAP_SIZE ((unsigned int) (5e+7))
+#define KEEP_BEST_UNTIL ((unsigned int) (2e+7))
+
 #define HEAP_LCHILD(NODE) (1 + (NODE) * 2)
 #define HEAP_RCHILD(NODE) (2 + (NODE) * 2)
 #define HEAP_MASTER(NODE) (((NODE) > 0) ? (((NODE) - 1) / 2) : 0)
@@ -43,5 +47,6 @@ void heap_push(heap *h,
 
 void heap_destroy(heap **h);
 unsigned long int heap_size(heap const *restrict h);
+void heap_conditional_purge(heap *h);
 
 #endif
